@@ -142,6 +142,27 @@ app.get("/locations", async () => {
   return locations;
 });
 
+app.post("/locations", async (req, reply) => {
+  const body = z
+    .object({
+      name: z.string().min(1),
+      note: z.string().optional(),
+      parentId: z.string().optional(),
+    })
+    .parse(req.body);
+
+  const created = await prisma.location.create({
+    data: {
+      name: body.name.trim(),
+      ...(body.note ? { note: body.note } : {}),
+      ...(body.parentId ? { parentId: body.parentId } : {}),
+    },
+    select: { id: true, name: true, note: true, parentId: true },
+  });
+
+  return reply.status(201).send(created);
+});
+
 /**
  * シリアル予約
  * POST /serials/reserve?type=ASSET|CONSUMABLE
