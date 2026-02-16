@@ -1,9 +1,19 @@
 import Fastify from "fastify";
 import { PrismaClient, TargetType, ActionType } from "@prisma/client";
-import { z } from "zod";
+import { z, ZodError } from "zod";
 
 const prisma = new PrismaClient();
 const app = Fastify({ logger: true });
+
+app.setErrorHandler((error, _req, reply) => {
+  if (error instanceof ZodError) {
+    return reply.status(400).send({
+      error: "Invalid request.",
+      issues: error.issues.map((i) => ({ path: i.path.join("."), message: i.message })),
+    });
+  }
+  return reply.status(500).send({ error: "Internal Server Error" });
+});
 
 async function getSystemUserId() {
   const system = await prisma.user.findUnique({
@@ -39,6 +49,98 @@ function formatSerial(prefix: string, seq: number) {
 }
 
 app.get("/health", async () => ({ ok: true }));
+
+app.get("/users", async () => {
+  const users = await prisma.user.findMany({
+    orderBy: { name: "asc" },
+    select: { id: true, name: true, role: true },
+    take: 200,
+  });
+  return users;
+});
+
+app.post("/users", async (req, reply) => {
+  const body = z
+    .object({
+      name: z.string().min(1),
+      role: z.enum(["ADMIN", "MEMBER"]).optional(),
+    })
+    .parse(req.body);
+
+  try {
+    const safeName = body.name.replace(/[^a-zA-Z0-9_-]/g, "").toLowerCase() || "user";
+    const syntheticEmail = `${safeName}-${Date.now()}@local`;
+    const created = await prisma.user.create({
+      data: {
+        name: body.name,
+        email: syntheticEmail,
+        role: body.role ?? "MEMBER",
+      },
+      select: { id: true, name: true, role: true, createdAt: true },
+    });
+    return reply.status(201).send(created);
+  } catch (e: any) {
+    if (e?.code === "P2002") {
+      return reply.status(409).send({ error: "User already exists." });
+    }
+    throw e;
+  }
+});
+
+app.get("/users/:id/assets", async (req, reply) => {
+  const params = z.object({ id: z.string().min(1) }).parse(req.params);
+
+  const user = await prisma.user.findUnique({
+    where: { id: params.id },
+    select: { id: true, name: true, role: true },
+  });
+  if (!user) return reply.status(404).send({ error: "User not found." });
+
+  const assets = await prisma.asset.findMany({
+    where: { currentUserId: params.id, status: "CHECKED_OUT" },
+    orderBy: { updatedAt: "desc" },
+    include: {
+      currentLocation: { select: { id: true, name: true } },
+    },
+    take: 500,
+  });
+
+  return {
+    user,
+    count: assets.length,
+    assets,
+  };
+});
+
+app.get("/asset-categories", async () => {
+  const rows = await prisma.asset.findMany({
+    select: { category: true },
+    distinct: ["category"],
+    orderBy: { category: "asc" },
+    take: 500,
+  });
+  return { items: rows.map((x) => x.category) };
+});
+
+app.get("/asset-budgets", async () => {
+  const rows = await prisma.asset.findMany({
+    where: { budgetCode: { not: null } },
+    select: { budgetCode: true },
+    distinct: ["budgetCode"],
+    orderBy: { budgetCode: "asc" },
+    take: 500,
+  });
+  return { items: rows.map((x) => x.budgetCode).filter((x): x is string => Boolean(x && x.trim())) };
+});
+
+app.get("/locations", async () => {
+  const locations = await prisma.location.findMany({
+    orderBy: { name: "asc" },
+    select: { id: true, name: true, note: true, parentId: true },
+    take: 500,
+  });
+  return locations;
+});
 
 /**
  * シリアル予約
@@ -102,6 +204,8 @@ app.post("/assets", async (req, reply) => {
       name: z.string().min(1),
       category: z.string().min(1),
       locationId: z.string().min(1),
+      budgetCode: z.string().optional(),
+      purchasedAt: z.coerce.date().optional(),
       note: z.string().optional(),
     })
     .parse(req.body);
@@ -128,7 +232,9 @@ app.post("/assets", async (req, reply) => {
         name: body.name,
         category: body.category,
         currentLocationId: body.locationId,
-        note: body.note,
+        ...(body.budgetCode ? { budgetCode: body.budgetCode } : {}),
+        ...(body.purchasedAt ? { purchasedAt: body.purchasedAt } : {}),
+        ...(body.note ? { note: body.note } : {}),
         lastActivityAt: new Date(),
       },
     });
@@ -343,6 +449,88 @@ app.get("/assets/:id", async (req, reply) => {
   return reply.send(asset);
 });
 
+app.put("/assets/:id", async (req, reply) => {
+  const params = z.object({ id: z.string().min(1) }).parse(req.params);
+  const body = z
+    .object({
+      name: z.string().min(1).optional(),
+      category: z.string().min(1).optional(),
+      locationId: z.string().min(1).optional(),
+      budgetCode: z.string().nullable().optional(),
+      purchasedAt: z.coerce.date().nullable().optional(),
+      note: z.string().nullable().optional(),
+    })
+    .parse(req.body);
+
+  const actorId = await getSystemUserId();
+
+  const result = await prisma.$transaction(async (tx) => {
+    const current = await tx.asset.findUnique({
+      where: { id: params.id },
+      select: { id: true, currentLocationId: true },
+    });
+    if (!current) {
+      reply.status(404);
+      return { error: "Asset not found." };
+    }
+
+    const data: any = { lastActivityAt: new Date() };
+    if (body.name !== undefined) data.name = body.name;
+    if (body.category !== undefined) data.category = body.category;
+    if (body.locationId !== undefined) data.currentLocationId = body.locationId;
+    if (body.budgetCode !== undefined) data.budgetCode = body.budgetCode;
+    if (body.purchasedAt !== undefined) data.purchasedAt = body.purchasedAt;
+    if (body.note !== undefined) data.note = body.note;
+
+    const updated = await tx.asset.update({
+      where: { id: params.id },
+      data,
+    });
+
+    await tx.activityLog.create({
+      data: {
+        actorId,
+        targetType: "ASSET",
+        targetId: updated.id,
+        action: "EDIT",
+        fromLocationId: current.currentLocationId,
+        toLocationId: updated.currentLocationId,
+        note: "asset metadata updated",
+      },
+    });
+
+    return updated;
+  });
+
+  if ("error" in result) return reply.send(result);
+  return reply.send(result);
+});
+
+// 開発検証用: 最終更新日時を過去日に変更
+app.post("/dev/assets/:id/backdate", async (req, reply) => {
+  const params = z.object({ id: z.string().min(1) }).parse(req.params);
+  const body = z
+    .object({
+      date: z.string().optional(), // ISO文字列推奨
+      daysAgo: z.coerce.number().int().min(1).max(3650).optional(),
+    })
+    .parse(req.body);
+
+  const targetDate =
+    body.date ? new Date(body.date) : new Date(Date.now() - (body.daysAgo ?? 180) * 24 * 60 * 60 * 1000);
+  if (Number.isNaN(targetDate.getTime())) {
+    return reply.status(400).send({ error: "Invalid date." });
+  }
+
+  const updated = await prisma.asset.update({
+    where: { id: params.id },
+    data: { lastActivityAt: targetDate },
+    select: { id: true, serial: true, name: true, lastActivityAt: true },
+  });
+
+  return reply.send(updated);
+});
+
 app.get("/assets", async (req) => {
   const q = z
     .object({
@@ -368,6 +556,7 @@ app.get("/assets", async (req) => {
       { serial: { contains: term, mode: "insensitive" } },
       { name: { contains: term, mode: "insensitive" } },
       { category: { contains: term, mode: "insensitive" } },
+      { budgetCode: { contains: term, mode: "insensitive" } },
     ];
   }
 
@@ -375,6 +564,10 @@ app.get("/assets", async (req) => {
     where,
     orderBy: { updatedAt: "desc" },
     take,
+    include: {
+      currentLocation: { select: { id: true, name: true } },
+      currentUser: { select: { id: true, name: true } },
+    },
   });
 
   return assets;
@@ -383,7 +576,9 @@ app.get("/assets", async (req) => {
 app.get("/stats", async (req) => {
   const q = z
     .object({
-      staleDays: z.coerce.number().int().min(1).max(3650).optional(),
+      staleDays: z
+        .preprocess((v) => (v === "" ? undefined : v), z.coerce.number().int().min(1).max(3650))
+        .optional(),
     })
     .parse(req.query);
 
@@ -409,7 +604,9 @@ app.get("/stats", async (req) => {
 app.get("/stale", async (req) => {
   const q = z
     .object({
-      days: z.coerce.number().int().min(1).max(3650).optional(),
+      days: z
+        .preprocess((v) => (v === "" ? undefined : v), z.coerce.number().int().min(1).max(3650))
+        .optional(),
       type: z.enum(["ASSET", "CONSUMABLE", "ALL"]).optional(),
       limit: z.coerce.number().int().min(1).max(200).optional(),
       offset: z.coerce.number().int().min(0).optional(),
@@ -437,7 +634,7 @@ app.get("/stale", async (req) => {
       take: takeForMerge,
       include: {
         currentLocation: { select: { name: true } },
-        currentUser: { select: { name: true, email: true } },
+        currentUser: { select: { name: true } },
       },
     });
 
@@ -450,7 +647,7 @@ app.get("/stale", async (req) => {
         category: a.category,
         status: a.status,
         location: a.currentLocation?.name ?? null,
-        user: a.currentUser ? { name: a.currentUser.name, email: a.currentUser.email } : null,
+        user: a.currentUser ? { name: a.currentUser.name } : null,
         lastActivityAt: a.lastActivityAt,
         daysSince: toDaysSince(a.lastActivityAt),
       });

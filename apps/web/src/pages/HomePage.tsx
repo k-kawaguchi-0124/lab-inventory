@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { apiUrl } from "../lib/api";
 
 type Stats = {
   checkedOutCount: number;
@@ -9,130 +10,158 @@ type Stats = {
   staleConsumableCount: number;
 };
 
-type Asset = {
+type AssetCandidate = {
   id: string;
   serial: string;
   name: string;
-  category: string;
   status: string;
-  currentLocationId: string;
-  currentUserId: string | null;
-  updatedAt: string;
 };
+
+const staleDays = 180;
 
 export function HomePage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<Asset[]>([]);
-  const [loading, setLoading] = useState(false);
-  const staleDays = 180;
+  const [candidates, setCandidates] = useState<AssetCandidate[]>([]);
+  const [candidateLoading, setCandidateLoading] = useState(false);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const navigate = useNavigate();
 
-  const statsUrl = useMemo(() => `/api/stats?staleDays=${staleDays}`, [staleDays]);
+  const statsUrl = useMemo(() => apiUrl(`/stats?staleDays=${staleDays}`), []);
 
   useEffect(() => {
+    setStatsLoading(true);
     fetch(statsUrl)
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then(setStats)
-      .catch(() => setStats(null));
+      .catch(() => setStats(null))
+      .finally(() => setStatsLoading(false));
   }, [statsUrl]);
 
-  async function search() {
-    if (!query.trim()) return;
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/assets?query=${encodeURIComponent(query.trim())}&take=20`);
-      const json = await res.json();
-      setResults(json);
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) {
+      setCandidates([]);
+      return;
     }
-  }
 
-  async function loadCheckedOut() {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/assets?status=CHECKED_OUT&take=20`);
-      const json = await res.json();
-      setResults(json);
-    } finally {
-      setLoading(false);
-    }
+    const timer = setTimeout(async () => {
+      setCandidateLoading(true);
+      try {
+        const res = await fetch(apiUrl(`/assets?query=${encodeURIComponent(q)}&take=8`));
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = (await res.json()) as AssetCandidate[];
+        setCandidates(json);
+      } catch {
+        setCandidates([]);
+      } finally {
+        setCandidateLoading(false);
+      }
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  function onSearch() {
+    const term = query.trim();
+    if (!term) return;
+    setCandidates([]);
+    navigate(`/assets/search?query=${encodeURIComponent(term)}`);
   }
 
   return (
-    <div style={{ padding: 16, fontFamily: "system-ui, sans-serif" }}>
-      <h1 style={{ marginBottom: 8 }}>Lab Inventory</h1>
+    <section className="home">
+      <div className="hero">
+        <p className="kicker">LAB MANAGEMENT</p>
+        <h1 className="hero-title">池永・野林研究室 物品管理</h1>
+        <p className="hero-subtitle">
+          備品検索、貸出中確認、長期未更新確認、日常運用の導線をこのトップページに集約しています。
+        </p>
+      </div>
 
-      <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
-        <div style={{ padding: 12, border: "1px solid #ddd", borderRadius: 8, minWidth: 180 }}>
-          <div style={{ color: "#666" }}>貸出中</div>
-          <div style={{ fontSize: 24 }}>{stats ? stats.checkedOutCount : "-"}</div>
-          <button onClick={loadCheckedOut} disabled={loading} style={{ marginTop: 8 }}>
-            一覧を見る
-          </button>
-        </div>
-
-        <div style={{ padding: 12, border: "1px solid #ddd", borderRadius: 8, minWidth: 220 }}>
-          <div style={{ color: "#666" }}>{staleDays}日以上 未更新</div>
-          <div style={{ fontSize: 24 }}>{stats ? stats.staleCount : "-"}</div>
-          <div style={{ color: "#666", fontSize: 12 }}>
-            備品 {stats?.staleAssetCount ?? "-"} / 消耗品 {stats?.staleConsumableCount ?? "-"}
-          </div>
-          <Link to="/stale" style={{ display: "inline-block", marginTop: 8 }}>
-            滞留一覧へ
+      <div className="panel">
+        <h2 className="panel-title">運用アクション</h2>
+        <div className="action-grid">
+          <Link to="/assets" className="action-link">
+            物品一覧
+          </Link>
+          <Link to="/assets/new" className="action-link">
+            新規登録
+          </Link>
+          <Link to="/assets/checkout" className="action-link">
+            貸出
+          </Link>
+          <Link to="/assets/checkin" className="action-link">
+            返却
           </Link>
         </div>
       </div>
 
-      <div style={{ marginBottom: 16, display: "flex", gap: 8, alignItems: "center" }}>
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="シリアル or 名前で検索"
-          style={{ width: 320, padding: 8 }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") search();
-          }}
-        />
-        <button onClick={search} disabled={loading}>
-          検索
-        </button>
-        <button onClick={loadCheckedOut} disabled={loading}>
-          貸出中を表示
-        </button>
+      <div className="stat-grid">
+        <article className="stat-card">
+          <p className="stat-label">貸出中</p>
+          <p className="stat-value">{statsLoading ? "..." : stats ? stats.checkedOutCount : "-"}</p>
+          <Link className="btn btn-secondary" to="/assets/search?status=CHECKED_OUT">
+            一覧を見る
+          </Link>
+        </article>
+
+        <article className="stat-card">
+          <p className="stat-label">{staleDays}日以上 長期未更新</p>
+          <p className="stat-value">{statsLoading ? "..." : stats ? stats.staleCount : "-"}</p>
+          <p className="stat-meta">
+            備品 {stats?.staleAssetCount ?? "-"} / 消耗品 {stats?.staleConsumableCount ?? "-"}
+          </p>
+          <Link to="/stale" className="link-inline">
+            長期未更新一覧へ
+          </Link>
+        </article>
       </div>
 
-      <h2 style={{ marginBottom: 8 }}>結果</h2>
-      <table width="100%" cellPadding={8} style={{ borderCollapse: "collapse" }}>
-        <thead>
-          <tr style={{ textAlign: "left", borderBottom: "1px solid #ddd" }}>
-            <th>Serial</th>
-            <th>Name</th>
-            <th>Category</th>
-            <th>Status</th>
-            <th>Updated</th>
-          </tr>
-        </thead>
-        <tbody>
-          {results.length === 0 ? (
-            <tr>
-              <td colSpan={5} style={{ color: "#666" }}>
-                まだ結果がありません（検索するか「貸出中を表示」を押してください）
-              </td>
-            </tr>
-          ) : (
-            results.map((a) => (
-              <tr key={a.id} style={{ borderBottom: "1px solid #f0f0f0" }}>
-                <td style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>{a.serial}</td>
-                <td>{a.name}</td>
-                <td>{a.category}</td>
-                <td>{a.status}</td>
-                <td>{new Date(a.updatedAt).toLocaleString()}</td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </div>
+      <div className="panel">
+        <h2 className="panel-title">検索</h2>
+        <div className="search-row">
+          <div className="autocomplete-wrap">
+            <input
+              className="input"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="シリアル or 名前で検索"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") onSearch();
+              }}
+            />
+            {candidateLoading && <div className="autocomplete-hint">候補を検索中...</div>}
+            {!candidateLoading && candidates.length > 0 && (
+              <div className="autocomplete-list">
+                {candidates.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className="autocomplete-item"
+                    onClick={() => {
+                      setQuery(c.serial);
+                      setCandidates([]);
+                      navigate(`/assets/search?query=${encodeURIComponent(c.serial)}`);
+                    }}
+                  >
+                    <span className="mono">{c.serial}</span>
+                    <span>{c.name}</span>
+                    <span>{c.status}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <button className="btn btn-primary" onClick={onSearch}>
+            結果ページへ
+          </button>
+        </div>
+      </div>
+
+    </section>
   );
 }
