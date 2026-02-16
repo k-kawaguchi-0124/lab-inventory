@@ -1,14 +1,184 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
+// prisma/schema.prisma
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+enum AssetStatus {
+  AVAILABLE   // 保管中/利用可能
+  CHECKED_OUT // 貸出中
+  BROKEN      // 故障
+  DISPOSED    // 廃棄
+}
+
+enum OwnerType {
+  ASSET
+  CONSUMABLE
+}
+
+enum TargetType {
+  ASSET
+  CONSUMABLE
+}
+
+enum ActionType {
+  CREATE
+  EDIT
+  CHECKOUT
+  CHECKIN
+  MOVE
+  QTY_CHANGE
+  STATUS_CHANGE
+}
+
+// =====================
+// Master
+// =====================
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  role      Role     @default(MEMBER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // relations
+  assetHoldings  Asset[]        @relation("AssetCurrentUser")
+  serialReserves SerialReservation[]
+  logs           ActivityLog[]  @relation("LogActor")
+}
+
+model Location {
+  id        String    @id @default(cuid())
+  name      String
+  note      String?
+  parentId  String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  parent   Location? @relation("LocationTree", fields: [parentId], references: [id])
+  children Location[] @relation("LocationTree")
+
+  assets      Asset[]
+  consumables Consumable[]
+}
+
+// =====================
+// Domain
+// =====================
+
+model Asset {
+  id                String      @id @default(cuid())
+  serial            String      @unique
+  name              String
+  category          String
+  status            AssetStatus @default(AVAILABLE)
+
+  currentLocationId String
+  currentUserId     String?
+
+  purchasedAt       DateTime?
+  budgetCode        String?
+  vendor            String?
+  note              String?
+
+  lastActivityAt    DateTime    @default(now())
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  // relations
+  currentLocation Location @relation(fields: [currentLocationId], references: [id])
+  currentUser     User?    @relation("AssetCurrentUser", fields: [currentUserId], references: [id])
+}
+
+model Consumable {
+  id               String   @id @default(cuid())
+  serial           String   @unique
+  name             String
+  category         String
+  unit             String   // kg, roll, sheet など
+  currentQty       Decimal  @default(0)
+  reorderThreshold Decimal  @default(0)
+
+  locationId       String
+  note             String?
+
+  lastActivityAt   DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // relations
+  location Location @relation(fields: [locationId], references: [id])
+}
+
+model Photo {
+  id        String    @id @default(cuid())
+  ownerType OwnerType
+  ownerId   String
+  objectKey String
+  mime      String?
+  width     Int?
+  height    Int?
+  createdAt DateTime  @default(now())
+
+  // Polymorphic relation (enforced at app layer):
+  // ownerType=ASSET -> Asset.id, ownerType=CONSUMABLE -> Consumable.id
+
+  @@index([ownerType, ownerId])
+}
+
+model ActivityLog {
+  id        String     @id @default(cuid())
+  actorId   String
+  targetType TargetType
+  targetId  String
+  action    ActionType
+
+  fromLocationId String?
+  toLocationId   String?
+  fromUserId     String?
+  toUserId       String?
+
+  qtyDelta  Decimal?
+  note      String?
+
+  createdAt DateTime @default(now())
+
+  actor User @relation("LogActor", fields: [actorId], references: [id])
+
+  @@index([targetType, targetId])
+  @@index([createdAt])
+}
+
+// =====================
+// Serial issuing
+// =====================
+
+model SerialCounter {
+  // prefix example: "26" (year), or "ASSET-26"
+  prefix    String  @id
+  nextValue Int     @default(1)
+  updatedAt DateTime @updatedAt
+}
+
+model SerialReservation {
+  serial     String   @id
+  type       TargetType
+  reservedBy String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [reservedBy], references: [id])
+
+  @@index([expiresAt])
 }
