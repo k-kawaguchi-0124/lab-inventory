@@ -1,9 +1,17 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Role } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
 async function main() {
-  // Locationが空なら初期場所を作る
+  // SYSTEM user
+  const systemEmail = "system@local";
+  await prisma.user.upsert({
+    where: { email: systemEmail },
+    update: {},
+    create: { name: "SYSTEM", email: systemEmail, role: Role.ADMIN },
+  });
+
+  // Locations
   const count = await prisma.location.count();
   if (count === 0) {
     await prisma.location.createMany({
@@ -16,6 +24,8 @@ async function main() {
   } else {
     console.log("Locations already exist. Skip seeding.");
   }
+
+  console.log("Seed completed.");
 }
 
 main()
