@@ -152,6 +152,187 @@ app.post("/assets", async (req, reply) => {
   return reply.status(201).send(asset);
 });
 
+app.post("/assets/:id/checkout", async (req, reply) => {
+  const params = z.object({ id: z.string().min(1) }).parse(req.params);
+
+  const body = z
+    .object({
+      userId: z.string().min(1),
+      locationId: z.string().min(1),
+      note: z.string().optional(),
+    })
+    .parse(req.body);
+
+  const actorId = await getSystemUserId();
+
+  const result = await prisma.$transaction(async (tx) => {
+    const current = await tx.asset.findUnique({
+      where: { id: params.id },
+      select: {
+        id: true,
+        status: true,
+        currentLocationId: true,
+        currentUserId: true,
+      },
+    });
+
+    if (!current) {
+      reply.status(404);
+      return { error: "Asset not found." };
+    }
+
+    // 更新
+    const updated = await tx.asset.update({
+      where: { id: params.id },
+      data: {
+        status: "CHECKED_OUT",
+        currentUserId: body.userId,
+        currentLocationId: body.locationId,
+        lastActivityAt: new Date(),
+      },
+    });
+
+    // ログ
+    await tx.activityLog.create({
+      data: {
+        actorId,
+        targetType: "ASSET",
+        targetId: updated.id,
+        action: "CHECKOUT",
+        fromLocationId: current.currentLocationId,
+        toLocationId: body.locationId,
+        fromUserId: current.currentUserId,
+        toUserId: body.userId,
+        note: body.note,
+      },
+    });
+
+    return updated;
+  });
+
+  // transaction内で reply.status を触った場合に備えて
+  if ("error" in result) return reply.send(result);
+
+  return reply.send(result);
+});
+
+app.post("/assets/:id/checkin", async (req, reply) => {
+  const params = z.object({ id: z.string().min(1) }).parse(req.params);
+
+  const body = z
+    .object({
+      locationId: z.string().min(1), // 返却先（共通棚など）
+      note: z.string().optional(),
+    })
+    .parse(req.body);
+
+  const actorId = await getSystemUserId();
+
+  const result = await prisma.$transaction(async (tx) => {
+    const current = await tx.asset.findUnique({
+      where: { id: params.id },
+      select: {
+        id: true,
+        currentLocationId: true,
+        currentUserId: true,
+        status: true,
+      },
+    });
+
+    if (!current) {
+      reply.status(404);
+      return { error: "Asset not found." };
+    }
+
+    const updated = await tx.asset.update({
+      where: { id: params.id },
+      data: {
+        status: "AVAILABLE",
+        currentUserId: null,
+        currentLocationId: body.locationId,
+        lastActivityAt: new Date(),
+      },
+    });
+
+    await tx.activityLog.create({
+      data: {
+        actorId,
+        targetType: "ASSET",
+        targetId: updated.id,
+        action: "CHECKIN",
+        fromLocationId: current.currentLocationId,
+        toLocationId: body.locationId,
+        fromUserId: current.currentUserId,
+        toUserId: null,
+        note: body.note,
+      },
+    });
+
+    return updated;
+  });
+
+  if ("error" in result) return reply.send(result);
+  return reply.send(result);
+});
+
+app.post("/assets/:id/move", async (req, reply) => {
+  const params = z.object({ id: z.string().min(1) }).parse(req.params);
+
+  const body = z
+    .object({
+      locationId: z.string().min(1),
+      note: z.string().optional(),
+    })
+    .parse(req.body);
+
+  const actorId = await getSystemUserId();
+
+  const result = await prisma.$transaction(async (tx) => {
+    const current = await tx.asset.findUnique({
+      where: { id: params.id },
+      select: {
+        id: true,
+        currentLocationId: true,
+        currentUserId: true,
+        status: true,
+      },
+    });
+
+    if (!current) {
+      reply.status(404);
+      return { error: "Asset not found." };
+    }
+
+    const updated = await tx.asset.update({
+      where: { id: params.id },
+      data: {
+        currentLocationId: body.locationId,
+        lastActivityAt: new Date(),
+      },
+    });
+
+    await tx.activityLog.create({
+      data: {
+        actorId,
+        targetType: "ASSET",
+        targetId: updated.id,
+        action: "MOVE",
+        fromLocationId: current.currentLocationId,
+        toLocationId: body.locationId,
+        fromUserId: current.currentUserId,
+        toUserId: current.currentUserId,
+        note: body.note,
+      },
+    });
+
+    return updated;
+  });
+
+  if ("error" in result) return reply.send(result);
+  return reply.send(result);
+});
+
+
 app.listen({ port: 3000, host: "0.0.0.0" }).then(() => {
   console.log("API listening on :3000");
 });
