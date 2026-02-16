@@ -380,6 +380,32 @@ app.get("/assets", async (req) => {
   return assets;
 });
 
+app.get("/stats", async (req) => {
+  const q = z
+    .object({
+      staleDays: z.coerce.number().int().min(1).max(3650).optional(),
+    })
+    .parse(req.query);
+
+  const staleDays = q.staleDays ?? 180;
+  const threshold = new Date(Date.now() - staleDays * 24 * 60 * 60 * 1000);
+
+  const [checkedOutCount, staleAssetCount, staleConsumableCount] = await Promise.all([
+    prisma.asset.count({ where: { status: "CHECKED_OUT" } }),
+    prisma.asset.count({ where: { lastActivityAt: { lt: threshold } } }),
+    prisma.consumable.count({ where: { lastActivityAt: { lt: threshold } } }),
+  ]);
+
+  return {
+    checkedOutCount,
+    staleDays,
+    staleCount: staleAssetCount + staleConsumableCount,
+    staleAssetCount,
+    staleConsumableCount,
+  };
+});
+
+
 app.get("/stale", async (req) => {
   const q = z
     .object({
