@@ -332,6 +332,240 @@ app.post("/assets/:id/move", async (req, reply) => {
   return reply.send(result);
 });
 
+app.get("/assets/:id", async (req, reply) => {
+  const params = z.object({ id: z.string().min(1) }).parse(req.params);
+
+  const asset = await prisma.asset.findUnique({
+    where: { id: params.id },
+  });
+
+  if (!asset) return reply.status(404).send({ error: "Asset not found." });
+  return reply.send(asset);
+});
+
+app.get("/assets", async (req) => {
+  const q = z
+    .object({
+      query: z.string().optional(),
+      status: z.enum(["AVAILABLE", "CHECKED_OUT", "BROKEN", "DISPOSED"]).optional(),
+      locationId: z.string().optional(),
+      userId: z.string().optional(),
+      take: z.coerce.number().int().min(1).max(200).optional(),
+    })
+    .parse(req.query);
+
+  const take = q.take ?? 50;
+
+  const where: any = {};
+
+  if (q.status) where.status = q.status;
+  if (q.locationId) where.currentLocationId = q.locationId;
+  if (q.userId) where.currentUserId = q.userId;
+
+  if (q.query && q.query.trim().length > 0) {
+    const term = q.query.trim();
+    where.OR = [
+      { serial: { contains: term, mode: "insensitive" } },
+      { name: { contains: term, mode: "insensitive" } },
+      { category: { contains: term, mode: "insensitive" } },
+    ];
+  }
+
+  const assets = await prisma.asset.findMany({
+    where,
+    orderBy: { updatedAt: "desc" },
+    take,
+  });
+
+  return assets;
+});
+
+app.get("/stale", async (req) => {
+  const q = z
+    .object({
+      days: z.coerce.number().int().min(1).max(3650).optional(),
+      type: z.enum(["ASSET", "CONSUMABLE", "ALL"]).optional(),
+      limit: z.coerce.number().int().min(1).max(200).optional(),
+      offset: z.coerce.number().int().min(0).optional(),
+    })
+    .parse(req.query);
+
+  const days = q.days ?? 180;
+  const limit = q.limit ?? 50;
+  const offset = q.offset ?? 0;
+  const type = q.type ?? "ALL";
+
+  const threshold = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  const now = Date.now();
+  const toDaysSince = (d: Date) =>
+    Math.floor((now - d.getTime()) / (24 * 60 * 60 * 1000));
+
+  const takeForMerge = Math.min(500, offset + limit);
+
+  const results: any[] = [];
+
+  if (type === "ASSET" || type === "ALL") {
+    const assets = await prisma.asset.findMany({
+      where: { lastActivityAt: { lt: threshold } },
+      orderBy: { lastActivityAt: "asc" },
+      take: takeForMerge,
+      include: {
+        currentLocation: { select: { name: true } },
+        currentUser: { select: { name: true, email: true } },
+      },
+    });
+
+    for (const a of assets) {
+      results.push({
+        type: "ASSET",
+        id: a.id,
+        serial: a.serial,
+        name: a.name,
+        category: a.category,
+        status: a.status,
+        location: a.currentLocation?.name ?? null,
+        user: a.currentUser ? { name: a.currentUser.name, email: a.currentUser.email } : null,
+        lastActivityAt: a.lastActivityAt,
+        daysSince: toDaysSince(a.lastActivityAt),
+      });
+    }
+  }
+
+  if (type === "CONSUMABLE" || type === "ALL") {
+    const consumables = await prisma.consumable.findMany({
+      where: { lastActivityAt: { lt: threshold } },
+      orderBy: { lastActivityAt: "asc" },
+      take: takeForMerge,
+      include: {
+        location: { select: { name: true } },
+      },
+    });
+
+    for (const c of consumables) {
+      results.push({
+        type: "CONSUMABLE",
+        id: c.id,
+        serial: c.serial,
+        name: c.name,
+        category: c.category,
+        unit: c.unit,
+        currentQty: c.currentQty,
+        reorderThreshold: c.reorderThreshold,
+        location: c.location?.name ?? null,
+        lastActivityAt: c.lastActivityAt,
+        daysSince: toDaysSince(c.lastActivityAt),
+      });
+    }
+  }
+
+  results.sort((a, b) => b.daysSince - a.daysSince);
+
+  const paged = results.slice(offset, offset + limit);
+
+  return {
+    meta: { days, type, limit, offset, returned: paged.length, totalApprox: results.length },
+    items: paged,
+  };
+});
+
+
+app.post("/alerts/rebuild", async (req) => {
+  const q = z.object({ days: z.coerce.number().int().min(1).max(3650).optional() }).parse(req.query);
+  const days = q.days ?? 180;
+  const threshold = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+  const staleAssets = await prisma.asset.findMany({
+    where: { lastActivityAt: { lt: threshold } },
+    select: { id: true, serial: true, name: true, lastActivityAt: true },
+    take: 1000,
+  });
+
+  const staleConsumables = await prisma.consumable.findMany({
+    where: { lastActivityAt: { lt: threshold } },
+    select: { id: true, serial: true, name: true, lastActivityAt: true },
+    take: 1000,
+  });
+
+  const makeBody = (d: Date) => `last update: ${d.toISOString()}`;
+
+  // upsert alerts
+  for (const a of staleAssets) {
+    await prisma.alert.upsert({
+      where: { type_targetType_targetId: { type: "STALE", targetType: "ASSET", targetId: a.id } },
+      update: {
+        title: `未更新(備品): ${a.name} (${a.serial})`,
+        body: makeBody(a.lastActivityAt),
+        // 既読は維持したいので isRead は触らない
+      },
+      create: {
+        type: "STALE",
+        targetType: "ASSET",
+        targetId: a.id,
+        title: `未更新(備品): ${a.name} (${a.serial})`,
+        body: makeBody(a.lastActivityAt),
+      },
+    });
+  }
+
+  for (const c of staleConsumables) {
+    await prisma.alert.upsert({
+      where: { type_targetType_targetId: { type: "STALE", targetType: "CONSUMABLE", targetId: c.id } },
+      update: {
+        title: `未更新(消耗品): ${c.name} (${c.serial})`,
+        body: makeBody(c.lastActivityAt),
+      },
+      create: {
+        type: "STALE",
+        targetType: "CONSUMABLE",
+        targetId: c.id,
+        title: `未更新(消耗品): ${c.name} (${c.serial})`,
+        body: makeBody(c.lastActivityAt),
+      },
+    });
+  }
+
+  return {
+    days,
+    createdOrUpdated: staleAssets.length + staleConsumables.length,
+  };
+});
+
+app.get("/alerts/unread-count", async () => {
+  const now = new Date();
+  const count = await prisma.alert.count({
+    where: {
+      isRead: false,
+      OR: [{ snoozeUntil: null }, { snoozeUntil: { lt: now } }],
+    },
+  });
+  return { count };
+});
+
+app.get("/alerts", async (req) => {
+  const q = z.object({ isRead: z.coerce.boolean().optional() }).parse(req.query);
+  const now = new Date();
+
+  const alerts = await prisma.alert.findMany({
+    where: {
+      isRead: q.isRead ?? false,
+      OR: [{ snoozeUntil: null }, { snoozeUntil: { lt: now } }],
+    },
+    orderBy: { createdAt: "desc" },
+    take: 200,
+  });
+
+  return alerts;
+});
+
+app.post("/alerts/:id/read", async (req, reply) => {
+  const params = z.object({ id: z.string().min(1) }).parse(req.params);
+  const updated = await prisma.alert.update({
+    where: { id: params.id },
+    data: { isRead: true },
+  });
+  return reply.send(updated);
+});
+
 
 app.listen({ port: 3000, host: "0.0.0.0" }).then(() => {
   console.log("API listening on :3000");
