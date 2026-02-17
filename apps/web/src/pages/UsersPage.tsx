@@ -41,8 +41,15 @@ export function UsersPage() {
       const res = await fetch(apiUrl("/users"));
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = (await res.json()) as User[];
-      setUsers(json);
-      if (!selectedUserId && json.length > 0) setSelectedUserId(json[0].id);
+      const visibleUsers = json.filter((u) => u.name.trim().toUpperCase() !== "SYSTEM");
+      setUsers(visibleUsers);
+      const stillSelected = visibleUsers.some((u) => u.id === selectedUserId);
+      if (!selectedUserId && visibleUsers.length > 0) {
+        setSelectedUserId(visibleUsers[0].id);
+      } else if (selectedUserId && !stillSelected) {
+        setSelectedUserId(visibleUsers[0]?.id ?? "");
+        setBorrowed(null);
+      }
     } catch (e: any) {
       setError(e?.message ?? "ユーザ一覧の取得に失敗しました");
       setUsers([]);
