@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { apiUrl } from "../lib/api";
+import { UiSelect } from "../components/UiSelect";
 
 type Location = { id: string; name: string };
 
@@ -82,13 +83,12 @@ export function AssetMovePage() {
         </label>
         <label className="field">
           <span>移動先</span>
-          <select value={locationId} onChange={(e) => setLocationId(e.target.value)} required>
-            {locations.map((loc) => (
-              <option key={loc.id} value={loc.id}>
-                {loc.name}
-              </option>
-            ))}
-          </select>
+          <UiSelect
+            value={locationId}
+            onChange={setLocationId}
+            required
+            options={locations.map((loc) => ({ value: loc.id, label: loc.name }))}
+          />
         </label>
         <label className="field">
           <span>保管場所新規登録</span>

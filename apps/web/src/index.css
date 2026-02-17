@@ -455,6 +455,121 @@ select option {
   min-width: 20px;
 }
 
+.ui-select {
+  position: relative;
+}
+
+.ui-select.is-disabled {
+  opacity: 0.7;
+}
+
+.ui-select-trigger {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid #cfd9ea;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--text);
+  font: inherit;
+  padding: 10px 36px 10px 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+  position: relative;
+}
+
+.ui-select-trigger::before,
+.ui-select-trigger::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
+.ui-select-trigger::before {
+  right: 30px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1px;
+  height: 18px;
+  background: #dbe4f3;
+}
+
+.ui-select-trigger::after {
+  right: 12px;
+  top: 50%;
+  transform: translateY(-30%);
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid #5a6a86;
+}
+
+.ui-select-trigger:hover {
+  border-color: #b8c8e4;
+}
+
+.ui-select-trigger:focus-visible,
+.ui-select-trigger.is-open {
+  outline: none;
+  border-color: #7ca8ef;
+  box-shadow: 0 0 0 3px rgba(31, 111, 235, 0.16);
+}
+
+.ui-select-label.is-placeholder {
+  color: #7a879d;
+}
+
+.ui-select-menu {
+  position: absolute;
+  z-index: 28;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid #cfd9ea;
+  border-radius: 10px;
+  box-shadow: 0 12px 30px rgba(23, 32, 51, 0.16);
+  max-height: 260px;
+  overflow: auto;
+  padding: 6px;
+}
+
+.ui-select-option {
+  width: 100%;
+  border: 0;
+  background: #fff;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  border-radius: 8px;
+  padding: 9px 10px;
+  cursor: pointer;
+}
+
+.ui-select-option:hover {
+  background: #eef4ff;
+}
+
+.ui-select-option.is-selected {
+  background: #e6efff;
+  color: var(--primary-strong);
+  font-weight: 700;
+}
+
+.ui-select-option:disabled {
+  color: #8b97aa;
+  cursor: not-allowed;
+}
+
+.ui-select-proxy {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+  border: 0;
+  padding: 0;
+}
+
 .serial-badge {
   border: 1px dashed #b8cae9;
   border-radius: 10px;

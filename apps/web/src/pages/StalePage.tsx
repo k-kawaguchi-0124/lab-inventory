@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiUrl } from "../lib/api";
+import { UiSelect } from "../components/UiSelect";
 
 type StaleType = "ASSET" | "CONSUMABLE" | "ALL";
 
@@ -72,11 +73,15 @@ export function StalePage() {
         </label>
         <label className="field-inline">
           <span>type</span>
-          <select value={type} onChange={(e) => setType(e.target.value as StaleType)}>
-            <option value="ASSET">ASSET</option>
-            <option value="CONSUMABLE">CONSUMABLE</option>
-            <option value="ALL">ALL</option>
-          </select>
+          <UiSelect
+            value={type}
+            onChange={(v) => setType(v as StaleType)}
+            options={[
+              { value: "ASSET", label: "ASSET" },
+              { value: "CONSUMABLE", label: "CONSUMABLE" },
+              { value: "ALL", label: "ALL" },
+            ]}
+          />
         </label>
         <button className="btn btn-secondary" onClick={load} disabled={loading}>
           更新

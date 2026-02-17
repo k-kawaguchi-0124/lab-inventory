@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiUrl } from "../lib/api";
+import { UiSelect } from "../components/UiSelect";
 
 type Asset = {
   id: string;
@@ -64,13 +65,17 @@ export function AssetListPage() {
           onChange={(e) => setQuery(e.target.value)}
           placeholder="名称 / シリアル / カテゴリ / 予算で絞り込み"
         />
-        <select value={status} onChange={(e) => setStatus(e.target.value)}>
-          <option value="">全ステータス</option>
-          <option value="AVAILABLE">AVAILABLE</option>
-          <option value="CHECKED_OUT">CHECKED_OUT</option>
-          <option value="BROKEN">BROKEN</option>
-          <option value="DISPOSED">DISPOSED</option>
-        </select>
+        <UiSelect
+          value={status}
+          onChange={setStatus}
+          options={[
+            { value: "", label: "全ステータス" },
+            { value: "AVAILABLE", label: "AVAILABLE" },
+            { value: "CHECKED_OUT", label: "CHECKED_OUT" },
+            { value: "BROKEN", label: "BROKEN" },
+            { value: "DISPOSED", label: "DISPOSED" },
+          ]}
+        />
         <button className="btn btn-secondary" onClick={load} disabled={loading}>
           再読み込み
         </button>

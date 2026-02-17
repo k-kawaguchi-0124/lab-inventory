@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { apiUrl } from "../lib/api";
+import { UiSelect } from "../components/UiSelect";
 
 type User = {
   id: string;
@@ -148,10 +149,14 @@ export function UsersPage() {
             </label>
             <label className="field">
               <span>権限</span>
-              <select value={role} onChange={(e) => setRole(e.target.value as "ADMIN" | "MEMBER")}>
-                <option value="MEMBER">MEMBER</option>
-                <option value="ADMIN">ADMIN</option>
-              </select>
+              <UiSelect
+                value={role}
+                onChange={(v) => setRole(v as "ADMIN" | "MEMBER")}
+                options={[
+                  { value: "MEMBER", label: "MEMBER" },
+                  { value: "ADMIN", label: "ADMIN" },
+                ]}
+              />
             </label>
             <div className="field field-full">
               <button className="btn btn-primary" type="submit">

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { apiUrl } from "../lib/api";
+import { UiSelect } from "../components/UiSelect";
 
 type Location = {
   id: string;
@@ -160,14 +161,15 @@ export function AssetCreatePage() {
         </label>
         <label className="field">
           <span>カテゴリ</span>
-          <select value={category} onChange={(e) => setCategory(e.target.value)} required>
-            <option value="">選択してください</option>
-            {categories.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
+          <UiSelect
+            value={category}
+            onChange={setCategory}
+            required
+            options={[
+              { value: "", label: "選択してください" },
+              ...categories.map((c) => ({ value: c, label: c })),
+            ]}
+          />
         </label>
         <label className="field">
           <span>カテゴリ新規登録</span>
@@ -184,14 +186,14 @@ export function AssetCreatePage() {
         </label>
         <label className="field field-compact">
           <span>予算</span>
-          <select value={budgetCode} onChange={(e) => setBudgetCode(e.target.value)}>
-            <option value="">選択してください</option>
-            {budgets.map((b) => (
-              <option key={b} value={b}>
-                {b}
-              </option>
-            ))}
-          </select>
+          <UiSelect
+            value={budgetCode}
+            onChange={setBudgetCode}
+            options={[
+              { value: "", label: "選択してください" },
+              ...budgets.map((b) => ({ value: b, label: b })),
+            ]}
+          />
         </label>
         <label className="field field-compact">
           <span>予算新規登録</span>
@@ -212,13 +214,12 @@ export function AssetCreatePage() {
         </label>
         <label className="field">
           <span>保管場所</span>
-          <select value={locationId} onChange={(e) => setLocationId(e.target.value)} required>
-            {locations.map((loc) => (
-              <option key={loc.id} value={loc.id}>
-                {loc.name}
-              </option>
-            ))}
-          </select>
+          <UiSelect
+            value={locationId}
+            onChange={setLocationId}
+            required
+            options={locations.map((loc) => ({ value: loc.id, label: loc.name }))}
+          />
         </label>
         <label className="field">
           <span>保管場所新規登録</span>

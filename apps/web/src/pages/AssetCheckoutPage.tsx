@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import { apiUrl } from "../lib/api";
+import { UiSelect } from "../components/UiSelect";
 
 type Location = { id: string; name: string };
 type User = { id: string; name: string };
@@ -160,24 +161,24 @@ export function AssetCheckoutPage() {
         </label>
         <label className="field">
           <span>貸出先ユーザー</span>
-          <select value={userId} onChange={(e) => setUserId(e.target.value)} required>
-            <option value="">選択してください</option>
-            {users.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.name}
-              </option>
-            ))}
-          </select>
+          <UiSelect
+            value={userId}
+            onChange={setUserId}
+            required
+            options={[
+              { value: "", label: "選択してください" },
+              ...users.map((u) => ({ value: u.id, label: u.name })),
+            ]}
+          />
         </label>
         <label className="field">
           <span>場所</span>
-          <select value={locationId} onChange={(e) => setLocationId(e.target.value)} required>
-            {locations.map((loc) => (
-              <option key={loc.id} value={loc.id}>
-                {loc.name}
-              </option>
-            ))}
-          </select>
+          <UiSelect
+            value={locationId}
+            onChange={setLocationId}
+            required
+            options={locations.map((loc) => ({ value: loc.id, label: loc.name }))}
+          />
         </label>
         <label className="field">
           <span>保管場所新規登録</span>

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import { apiUrl } from "../lib/api";
+import { UiSelect } from "../components/UiSelect";
 
 type Location = { id: string; name: string };
 type User = { id: string; name: string; role: "ADMIN" | "MEMBER" };
@@ -134,42 +135,42 @@ export function AssetCheckinPage() {
       <form className="form-grid" onSubmit={onSubmit}>
         <label className="field">
           <span>ユーザ</span>
-          <select value={selectedUserId} onChange={(e) => setSelectedUserId(e.target.value)} required>
-            <option value="">選択してください</option>
-            {users.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.name}
-              </option>
-            ))}
-          </select>
+          <UiSelect
+            value={selectedUserId}
+            onChange={setSelectedUserId}
+            required
+            options={[
+              { value: "", label: "選択してください" },
+              ...users.map((u) => ({ value: u.id, label: u.name })),
+            ]}
+          />
         </label>
         <label className="field">
           <span>返却する備品</span>
-          <select value={assetId} onChange={(e) => setAssetId(e.target.value)} required disabled={!selectedUserId || loadingAssets}>
-            {!selectedUserId ? (
-              <option value="">先にユーザを選択してください</option>
-            ) : loadingAssets ? (
-              <option value="">読み込み中...</option>
-            ) : borrowedAssets.length === 0 ? (
-              <option value="">貸出中の備品はありません</option>
-            ) : (
-              borrowedAssets.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name} / {a.serial}
-                </option>
-              ))
-            )}
-          </select>
+          <UiSelect
+            value={assetId}
+            onChange={setAssetId}
+            required
+            disabled={!selectedUserId || loadingAssets}
+            options={
+              !selectedUserId
+                ? [{ value: "", label: "先にユーザを選択してください" }]
+                : loadingAssets
+                  ? [{ value: "", label: "読み込み中..." }]
+                  : borrowedAssets.length === 0
+                    ? [{ value: "", label: "貸出中の備品はありません" }]
+                    : borrowedAssets.map((a) => ({ value: a.id, label: `${a.name} / ${a.serial}` }))
+            }
+          />
         </label>
         <label className="field">
           <span>返却先</span>
-          <select value={locationId} onChange={(e) => setLocationId(e.target.value)} required>
-            {locations.map((loc) => (
-              <option key={loc.id} value={loc.id}>
-                {loc.name}
-              </option>
-            ))}
-          </select>
+          <UiSelect
+            value={locationId}
+            onChange={setLocationId}
+            required
+            options={locations.map((loc) => ({ value: loc.id, label: loc.name }))}
+          />
         </label>
         <label className="field">
           <span>保管場所新規登録</span>

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiUrl } from "../lib/api";
+import { UiSelect } from "../components/UiSelect";
 
 type Location = { id: string; name: string };
 
@@ -351,14 +352,14 @@ export function ConsumablesPage() {
           </label>
           <label className="field">
             <span>カテゴリ</span>
-            <select value={category} onChange={(e) => setCategory(e.target.value)}>
-              <option value="">選択してください</option>
-              {categories.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
+            <UiSelect
+              value={category}
+              onChange={setCategory}
+              options={[
+                { value: "", label: "選択してください" },
+                ...categories.map((c) => ({ value: c, label: c })),
+              ]}
+            />
           </label>
           <label className="field">
             <span>カテゴリ新規登録</span>
@@ -371,10 +372,14 @@ export function ConsumablesPage() {
           </label>
           <label className="field">
             <span>単位</span>
-            <select value={unit} onChange={(e) => setUnit(e.target.value as "個" | "本")}>
-              <option value="個">個</option>
-              <option value="本">本</option>
-            </select>
+            <UiSelect
+              value={unit}
+              onChange={(v) => setUnit(v as "個" | "本")}
+              options={[
+                { value: "個", label: "個" },
+                { value: "本", label: "本" },
+              ]}
+            />
           </label>
           <label className="field">
             <span>現在数量</span>
@@ -396,13 +401,11 @@ export function ConsumablesPage() {
           </label>
           <label className="field">
             <span>保管場所</span>
-            <select value={locationId} onChange={(e) => setLocationId(e.target.value)}>
-              {locations.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.name}
-                </option>
-              ))}
-            </select>
+            <UiSelect
+              value={locationId}
+              onChange={setLocationId}
+              options={locations.map((l) => ({ value: l.id, label: l.name }))}
+            />
           </label>
           <label className="field">
             <span>保管場所新規登録</span>
