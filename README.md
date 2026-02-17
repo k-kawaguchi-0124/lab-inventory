@@ -1,7 +1,7 @@
 # Lab Inventory System
 
-研究室の備品・消耗品を管理するための Web アプリケーションです。  
-シリアル管理、貸出/返却、長期未更新一覧、ユーザ管理をブラウザから操作できます。
+研究室の備品・消耗品を管理する Web アプリケーションです。  
+シリアルのみを物品に貼り、Web から検索・貸出/返却・編集・在庫更新を行います。
 
 ## 技術スタック
 
@@ -9,34 +9,55 @@
 - Web: React + Vite + TypeScript
 - Infra (dev): Docker Compose (PostgreSQL / MinIO)
 
-## 主な機能（現状）
+## 主な機能（最新版）
 
-### API
+### 備品（Asset）
 
-- シリアル予約: `POST /serials/reserve?type=ASSET|CONSUMABLE`
-- 備品登録: `POST /assets`
-- 備品編集: `PUT /assets/:id`（シリアルは更新不可）
+- シリアル予約: `POST /serials/reserve?type=ASSET`
+- 登録: `POST /assets`
+- 編集: `PUT /assets/:id`（シリアルは編集不可）
+- 削除: `DELETE /assets/:id`（貸出中は削除不可）
 - 貸出: `POST /assets/:id/checkout`
 - 返却: `POST /assets/:id/checkin`
-- 移動: `POST /assets/:id/move`
-- 備品検索: `GET /assets`
-- 長期未更新一覧: `GET /stale?days=180&type=ASSET|CONSUMABLE|ALL`
+- 移動: `POST /assets/:id/move`（APIは維持）
+- 検索/一覧: `GET /assets`
+
+### 消耗品（Consumable）
+
+- シリアル予約: `POST /serials/reserve?type=CONSUMABLE`
+- 登録: `POST /consumables`
+- 在庫一覧: `GET /consumables`
+- 在庫増減: `POST /consumables/:id/adjust`
+  - 数量は整数（小数なし）
+  - `+/-` ボタンで直接更新
+  - 0 でもデータは残る
+
+### 長期未更新
+
+- 一覧: `GET /stale?days=180&type=ASSET|CONSUMABLE|ALL`
 - 統計: `GET /stats?staleDays=180`
-- ユーザ一覧/登録: `GET /users`, `POST /users`
+
+### ユーザ
+
+- 一覧/登録/削除: `GET /users`, `POST /users`, `DELETE /users/:id`
 - ユーザ別貸出一覧: `GET /users/:id/assets`
-- カテゴリ候補: `GET /asset-categories`
-- 予算候補: `GET /asset-budgets`
+- `SYSTEM` ユーザは内部用（UI非表示・削除不可）
 
-### Web
+### マスタ管理
 
-- Home ダッシュボード（統計・検索導線・運用アクション）
-- 物品一覧ページ
-- 検索結果ページ（編集/貸出/返却導線）
-- 長期未更新一覧ページ
-- 備品の新規登録/編集ページ
-  - カテゴリ: 選択式 + 新規追加
-  - 予算: 選択式 + 新規追加
-- ユーザ管理ページ（登録 + ユーザ別貸出中一覧）
+- 画面: `/masters`
+- 管理対象:
+  - 備品カテゴリ
+  - 備品予算
+  - 消耗品カテゴリ
+  - 保管場所
+- 追加/名称変更/削除（使用中は削除不可）
+
+## UI 方針（現在）
+
+- トップナビ順: `物品一覧 / 新規登録 / 消耗品 / 長期未更新 / ユーザ / マスタ管理`
+- 新規追加系（カテゴリ/予算/保管場所）は通常非表示
+- 各入力欄の下に `＋ 新しい...を追加` を配置し、必要時のみ展開
 
 ## リポジトリ構成
 
@@ -44,6 +65,8 @@
 lab-inventory/
   docker/
     docker-compose.dev.yml
+  deploy/
+    systemd/
   apps/
     api/
       prisma/
@@ -54,7 +77,7 @@ lab-inventory/
 
 ## ローカル開発手順
 
-### 1. 依存
+### 1. 必要ソフト
 
 - Node.js 20 以上
 - Docker / Docker Compose
@@ -91,6 +114,7 @@ Prisma 適用:
 
 ```bash
 npx prisma migrate deploy
+npx prisma generate
 npx prisma db seed
 ```
 
@@ -121,64 +145,18 @@ npm run dev -- --host 0.0.0.0
 - Web: `http://localhost:5173`
 - API: `http://localhost:3000`
 
-## Proxmox LXC での構築手順
+## systemd で常駐運用
 
-### 1. LXC 作成
+`deploy/systemd` にユニットと補助スクリプトを用意しています。
 
-- テンプレート: Ubuntu 22.04 または Debian 12
-- 推奨: 2 vCPU / 4GB RAM / 20GB+
-
-### 2. LXC 設定（Docker 用）
-
-Proxmox ホストで `/etc/pve/lxc/<CTID>.conf` に以下を設定:
-
-```conf
-features: nesting=1,keyctl=1
-```
-
-必要に応じて:
-
-```conf
-lxc.apparmor.profile: unconfined
-lxc.cgroup2.devices.allow: a
-lxc.mount.auto: proc:rw sys:rw
-```
-
-設定後、コンテナを再起動。
-
-### 3. コンテナ内セットアップ
-
-```bash
-apt update && apt -y upgrade
-apt install -y git curl ca-certificates gnupg lsb-release docker.io docker-compose-plugin
-systemctl enable --now docker
-curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-apt install -y nodejs
-```
-
-### 4. アプリ配置と起動
-
-```bash
-cd /opt
-git clone https://github.com/k-kawaguchi-0124/lab-inventory.git
-cd lab-inventory
-docker compose -f docker/docker-compose.dev.yml up -d
-```
-
-以降は「ローカル開発手順」の API/Web 起動手順と同じです。
-
-## systemd で常駐運用（nohup 代替）
-
-`deploy/systemd` に API/Web のユニットファイルと補助スクリプトを用意しています。
-
-### 1. サービスインストール
+### サービス導入
 
 ```bash
 cd /opt/lab-inventory
 ./deploy/systemd/install-services.sh
 ```
 
-### 2. 起動・停止
+### 起動/停止
 
 ```bash
 sudo systemctl start lab-inventory-api.service
@@ -188,7 +166,7 @@ sudo systemctl stop lab-inventory-api.service
 sudo systemctl stop lab-inventory-web.service
 ```
 
-### 3. 状態とログ確認
+### 状態/ログ確認
 
 ```bash
 systemctl status lab-inventory-api.service --no-pager
@@ -198,55 +176,23 @@ journalctl -u lab-inventory-api.service -f
 journalctl -u lab-inventory-web.service -f
 ```
 
-### 4. 更新反映（pull + install + migrate + restart）
+### 更新反映（推奨）
 
 ```bash
 cd /opt/lab-inventory
 ./deploy/systemd/update-and-restart.sh
 ```
 
-## 起動時の操作（運用手順）
+このスクリプトは以下を実行します。
 
-サーバ再起動後や日次運用で、最低限この手順を実行してください。
-
-### 1. Docker（DB/MinIO）を起動
-
-```bash
-sudo systemctl start docker
-cd /opt/lab-inventory
-docker compose -f docker/docker-compose.dev.yml up -d
-```
-
-### 2. アプリ（API/Web）を起動
-
-systemd 運用の場合:
-
-```bash
-sudo systemctl start lab-inventory-api.service
-sudo systemctl start lab-inventory-web.service
-```
-
-### 3. ヘルスチェック
-
-```bash
-curl http://localhost:3000/health
-systemctl status lab-inventory-api.service --no-pager
-systemctl status lab-inventory-web.service --no-pager
-ss -ltnp | grep -E '3000|5173'
-```
-
-### 4. 反映作業時（更新手順）
-
-```bash
-cd /opt/lab-inventory
-./deploy/systemd/update-and-restart.sh
-```
+- `git fetch` / `git pull --ff-only`
+- API/Web の依存更新
+- `npx prisma migrate deploy`
+- API/Web サービス再起動
 
 ## Git 更新をサーバへ反映する手順
 
-ローカル開発PCでの作業と、サーバ反映作業を分けて実行します。
-
-### A. ローカル開発PC側（GitHubへ反映）
+### A. 開発PC側
 
 ```bash
 cd <your-local-repo>/lab-inventory
@@ -255,56 +201,53 @@ git commit -m "your message"
 git push origin main
 ```
 
-### B. サーバ側（GitHubの更新を取り込んで反映）
+### B. サーバ側
 
 ```bash
 cd /opt/lab-inventory
 ./deploy/systemd/update-and-restart.sh
 ```
 
-このスクリプトは以下を自動実行します。
-
-- `git fetch` / `git pull --ff-only`
-- API/Web の `npm install`
-- `npx prisma migrate deploy`
-- `lab-inventory-api.service` / `lab-inventory-web.service` の再起動
-
 ### C. 反映確認
 
 ```bash
 curl http://localhost:3000/health
+curl -i http://localhost:3000/masters
 systemctl status lab-inventory-api.service --no-pager
 systemctl status lab-inventory-web.service --no-pager
 ```
 
-### D. systemd 未導入の場合（暫定）
+## トラブルシュート
+
+### `/masters` が HTTP 500
+
+多くは DB マイグレーション未適用です。
 
 ```bash
-cd /opt/lab-inventory
-git pull --ff-only origin main
-
-cd /opt/lab-inventory/apps/api && npm install
-cd /opt/lab-inventory/apps/web && npm install
-cd /opt/lab-inventory/apps/api && npx prisma migrate deploy
-
-pkill -f "tsx watch src/index.ts" || true
-pkill -f "vite --host 0.0.0.0 --port 5173" || true
-
 cd /opt/lab-inventory/apps/api
-nohup npm run dev > api.dev.log 2>&1 &
-
-cd /opt/lab-inventory/apps/web
-nohup npm run dev -- --host 0.0.0.0 --port 5173 > web.dev.log 2>&1 &
+npx prisma migrate deploy
+npx prisma generate
+sudo systemctl restart lab-inventory-api.service
 ```
 
-### 5. トラブル時ログ確認
+### Prisma: `DATABASE_URL` がない
+
+`apps/api/.env` に `DATABASE_URL` を設定してください。
+
+### DB 認証エラー（P1000）
+
+- `DATABASE_URL` のユーザ/パスワードを確認
+- `docker compose -f docker/docker-compose.dev.yml up -d` でDBが起動しているか確認
+
+### APIが起動していない（Connection refused）
 
 ```bash
-journalctl -u lab-inventory-api.service -n 100 --no-pager
-journalctl -u lab-inventory-web.service -n 100 --no-pager
+systemctl status lab-inventory-api.service --no-pager
+journalctl -u lab-inventory-api.service -n 200 --no-pager
+ss -ltnp | grep 3000
 ```
 
-## 主要 API エンドポイント（抜粋）
+## API エンドポイント（抜粋）
 
 ```text
 GET  /health
@@ -312,22 +255,46 @@ GET  /stats?staleDays=180
 GET  /stale?days=180&type=ASSET
 
 POST /serials/reserve?type=ASSET
-POST /assets
-PUT  /assets/:id
-GET  /assets?query=...
-POST /assets/:id/checkout
-POST /assets/:id/checkin
-POST /assets/:id/move
+POST /serials/reserve?type=CONSUMABLE
 
-GET  /users
-POST /users
-GET  /users/:id/assets
+POST   /assets
+PUT    /assets/:id
+DELETE /assets/:id
+GET    /assets?query=...
+POST   /assets/:id/checkout
+POST   /assets/:id/checkin
+POST   /assets/:id/move
 
-GET  /asset-categories
-GET  /asset-budgets
+POST /consumables
+GET  /consumables
+POST /consumables/:id/adjust
+
+GET    /users
+POST   /users
+DELETE /users/:id
+GET    /users/:id/assets
+
+GET /asset-categories
+GET /asset-budgets
+GET /consumable-categories
+
+GET    /masters
+POST   /masters/asset-categories
+PUT    /masters/asset-categories
+DELETE /masters/asset-categories/:name
+POST   /masters/asset-budgets
+PUT    /masters/asset-budgets
+DELETE /masters/asset-budgets/:name
+POST   /masters/consumable-categories
+PUT    /masters/consumable-categories
+DELETE /masters/consumable-categories/:name
+POST   /masters/locations
+PUT    /masters/locations/:id
+DELETE /masters/locations/:id
 ```
 
 ## 補足
 
 - Web 開発時は Vite proxy により `/api/*` が `http://localhost:3000` に転送されます。
-- Preview/本番向けには `VITE_API_BASE` で API 接続先を指定できます（`apps/web/src/lib/api.ts`）。
+- 本番運用は Vite dev サーバ直公開ではなく、前段リバースプロキシ（Nginx/Apache）を推奨します。
+- API の `SYSTEM` ユーザ（`system@local`）は起動時に自動作成されます。
