@@ -7,7 +7,7 @@
 
 - API: Node.js + TypeScript + Fastify + Prisma + PostgreSQL
 - Web: React + Vite + TypeScript
-- Infra (dev): Docker Compose (PostgreSQL / MinIO)
+- Infra (dev): Docker Compose (PostgreSQL)
 
 ## 主な機能（最新版）
 
@@ -90,7 +90,7 @@ git clone https://github.com/k-kawaguchi-0124/lab-inventory.git
 cd lab-inventory
 ```
 
-### 3. DB / MinIO 起動
+### 3. DB 起動
 
 ```bash
 docker compose -f docker/docker-compose.dev.yml up -d
