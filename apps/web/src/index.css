@@ -224,6 +224,7 @@ a {
 .form-row {
   display: flex;
   gap: 10px;
+  margin-bottom: 20px;
   align-items: center;
   flex-wrap: wrap;
 }
