@@ -21,6 +21,10 @@ export function UiSelect({ value, options, onChange, placeholder = "選択して
   const selected = useMemo(() => options.find((o) => o.value === value) ?? null, [options, value]);
 
   useEffect(() => {
+    setOpen(false);
+  }, [value]);
+
+  useEffect(() => {
     function onDocClick(e: MouseEvent) {
       if (!rootRef.current) return;
       if (!rootRef.current.contains(e.target as Node)) {
