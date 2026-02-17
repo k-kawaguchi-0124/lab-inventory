@@ -16,13 +16,16 @@ app.setErrorHandler((error, _req, reply) => {
 });
 
 async function getSystemUserId() {
-  const system = await prisma.user.findUnique({
+  const system = await prisma.user.upsert({
     where: { email: "system@local" },
+    update: {},
+    create: {
+      name: "SYSTEM",
+      email: "system@local",
+      role: "ADMIN",
+    },
     select: { id: true },
   });
-  if (!system) {
-    throw new Error('SYSTEM user not found. Run "npx prisma db seed".');
-  }
   return system.id;
 }
 
@@ -1014,6 +1017,13 @@ app.post("/alerts/:id/read", async (req, reply) => {
 });
 
 
-app.listen({ port: 3000, host: "0.0.0.0" }).then(() => {
+async function start() {
+  await getSystemUserId();
+  await app.listen({ port: 3000, host: "0.0.0.0" });
   console.log("API listening on :3000");
+}
+
+start().catch((err) => {
+  app.log.error(err);
+  process.exit(1);
 });
