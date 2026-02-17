@@ -377,9 +377,10 @@ app.post("/locations", async (req, reply) => {
 app.post("/serials/reserve", async (req, reply) => {
   const q = z.object({ type: z.enum(["ASSET", "CONSUMABLE"]) }).parse(req.query);
 
-  // 年度prefixはひとまず「西暦下2桁」
+  // 年度prefixは「西暦下2桁」。
+  // シリアル文字列は type を含まないため、カウンタはタイプ別に分けず共通化して衝突を防ぐ。
   const year2 = String(new Date().getFullYear()).slice(-2);
-  const prefix = `${q.type}-${year2}`; // counter用（タイプ別に衝突しない）
+  const prefix = `${year2}`;
 
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
@@ -391,15 +392,29 @@ app.post("/serials/reserve", async (req, reply) => {
       update: {},
     });
 
-    const seq = counter.nextValue;
+    let seq = counter.nextValue;
+    let serial = formatSerial(year2, seq);
+
+    // 既存データ（予約/備品/消耗品）と衝突しないシリアルを探す
+    // 既存環境で採番方式が変わった後でも重複による500を防ぐ
+    while (true) {
+      const [reserved, asset, consumable] = await Promise.all([
+        tx.serialReservation.findUnique({ where: { serial }, select: { serial: true } }),
+        tx.asset.findUnique({ where: { serial }, select: { id: true } }),
+        tx.consumable.findUnique({ where: { serial }, select: { id: true } }),
+      ]);
+
+      if (!reserved && !asset && !consumable) break;
+
+      seq += 1;
+      serial = formatSerial(year2, seq);
+    }
 
     // 次回用にインクリメント
     await tx.serialCounter.update({
       where: { prefix },
       data: { nextValue: seq + 1 },
     });
-
-    const serial = formatSerial(year2, seq);
 
     // 予約を作成（既にあれば例外になる）
     await tx.serialReservation.create({
