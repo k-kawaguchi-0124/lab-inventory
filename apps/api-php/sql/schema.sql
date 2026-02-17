@@ -1,0 +1,146 @@
+-- Lab Inventory (PHP + MariaDB) draft schema
+-- MariaDB 10.6+
+
+CREATE TABLE IF NOT EXISTS users (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  name VARCHAR(255) NOT NULL,
+  role ENUM('ADMIN', 'MEMBER') NOT NULL DEFAULT 'MEMBER',
+  is_system TINYINT(1) NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_users_name (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS locations (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  name VARCHAR(255) NOT NULL,
+  note TEXT NULL,
+  parent_id BIGINT UNSIGNED NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_locations_name (name),
+  CONSTRAINT fk_locations_parent FOREIGN KEY (parent_id) REFERENCES locations(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS asset_category_masters (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  name VARCHAR(255) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_asset_category_name (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS asset_budget_masters (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  name VARCHAR(255) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_asset_budget_name (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS consumable_category_masters (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  name VARCHAR(255) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_consumable_category_name (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS assets (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  serial VARCHAR(64) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  category VARCHAR(255) NOT NULL,
+  status ENUM('AVAILABLE', 'CHECKED_OUT', 'BROKEN', 'DISPOSED') NOT NULL DEFAULT 'AVAILABLE',
+  current_location_id BIGINT UNSIGNED NOT NULL,
+  current_user_id BIGINT UNSIGNED NULL,
+  purchased_at DATE NULL,
+  budget_code VARCHAR(255) NULL,
+  vendor VARCHAR(255) NULL,
+  note TEXT NULL,
+  last_activity_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_assets_serial (serial),
+  KEY idx_assets_name (name),
+  KEY idx_assets_status (status),
+  KEY idx_assets_location (current_location_id),
+  KEY idx_assets_user (current_user_id),
+  CONSTRAINT fk_assets_location FOREIGN KEY (current_location_id) REFERENCES locations(id),
+  CONSTRAINT fk_assets_user FOREIGN KEY (current_user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS consumables (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  serial VARCHAR(64) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  category VARCHAR(255) NOT NULL,
+  unit ENUM('個', '本') NOT NULL,
+  current_qty INT NOT NULL DEFAULT 0,
+  reorder_threshold INT NOT NULL DEFAULT 0,
+  location_id BIGINT UNSIGNED NOT NULL,
+  note TEXT NULL,
+  last_activity_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_consumables_serial (serial),
+  KEY idx_consumables_name (name),
+  KEY idx_consumables_location (location_id),
+  CONSTRAINT fk_consumables_location FOREIGN KEY (location_id) REFERENCES locations(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS serial_counters (
+  prefix VARCHAR(16) NOT NULL,
+  next_value INT NOT NULL DEFAULT 1,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (prefix)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS serial_reservations (
+  serial VARCHAR(64) NOT NULL,
+  target_type ENUM('ASSET', 'CONSUMABLE') NOT NULL,
+  reserved_by BIGINT UNSIGNED NOT NULL,
+  expires_at DATETIME NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (serial),
+  KEY idx_serial_reservations_exp (expires_at),
+  CONSTRAINT fk_serial_reservation_user FOREIGN KEY (reserved_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS activity_logs (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  actor_id BIGINT UNSIGNED NOT NULL,
+  target_type ENUM('ASSET', 'CONSUMABLE') NOT NULL,
+  target_id BIGINT UNSIGNED NOT NULL,
+  action ENUM('CREATE', 'EDIT', 'CHECKOUT', 'CHECKIN', 'MOVE', 'QTY_CHANGE', 'STATUS_CHANGE') NOT NULL,
+  from_location_id BIGINT UNSIGNED NULL,
+  to_location_id BIGINT UNSIGNED NULL,
+  from_user_id BIGINT UNSIGNED NULL,
+  to_user_id BIGINT UNSIGNED NULL,
+  qty_delta INT NULL,
+  note TEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_activity_target (target_type, target_id),
+  KEY idx_activity_created (created_at),
+  CONSTRAINT fk_activity_actor FOREIGN KEY (actor_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT INTO users(name, role, is_system)
+SELECT 'SYSTEM', 'ADMIN', 1
+WHERE NOT EXISTS (
+  SELECT 1 FROM users WHERE is_system = 1
+);
+
+INSERT INTO locations(name, note)
+SELECT '研究室(共通棚)', '初期デフォルト'
+WHERE NOT EXISTS (
+  SELECT 1 FROM locations WHERE name = '研究室(共通棚)'
+);

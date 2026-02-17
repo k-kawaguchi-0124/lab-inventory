@@ -13,6 +13,12 @@ import { AssetSearchPage } from "./pages/AssetSearchPage";
 import { ConsumablesPage } from "./pages/ConsumablesPage";
 import { MastersPage } from "./pages/MastersPage";
 
+const routerBase = (() => {
+  const base = (import.meta as any).env?.BASE_URL ?? "/";
+  if (base === "/") return "/";
+  return String(base).replace(/\/$/, "");
+})();
+
 function AppLayout() {
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
@@ -85,7 +91,7 @@ function AppLayout() {
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={routerBase}>
       <AppLayout />
     </BrowserRouter>
   );

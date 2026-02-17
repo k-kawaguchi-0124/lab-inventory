@@ -9,6 +9,14 @@
 - Web: React + Vite + TypeScript
 - Infra (dev): Docker Compose (PostgreSQL / MinIO)
 
+## Apache + PHP + MariaDB への移行ブランチについて
+
+このブランチ（`feature/php-apache-mariadb-migration`）では、Apache/PHP/MariaDB 運用へ移行するための土台を追加しています。
+
+- 仕様書: `docs/php-mariadb-migration-spec.md`
+- PHP API 雛形: `apps/api-php/`
+- MariaDB スキーマ案: `apps/api-php/sql/schema.sql`
+
 ## 主な機能（最新版）
 
 ### 備品（Asset）
@@ -298,3 +306,19 @@ DELETE /masters/locations/:id
 - Web 開発時は Vite proxy により `/api/*` が `http://localhost:3000` に転送されます。
 - 本番運用は Vite dev サーバ直公開ではなく、前段リバースプロキシ（Nginx/Apache）を推奨します。
 - API の `SYSTEM` ユーザ（`system@local`）は起動時に自動作成されます。
+
+### `/xxxx/` 配下での運用（Apache サブパス）
+
+`https://example.com/xxxx/` で配信する場合は、Webビルド時にベースパスを指定してください。
+
+```bash
+cd apps/web
+VITE_APP_BASE=/xxxx/ npm run build
+```
+
+API はデフォルトで `/xxxx/api` を参照します（`VITE_API_BASE` 未指定時）。
+
+Apache 側は以下の2点を設定します。
+
+- `/xxxx` を `apps/web/dist` に向ける（SPA fallbackあり）
+- `/xxxx/api` を `http://127.0.0.1:3000/` へ `ProxyPass`
