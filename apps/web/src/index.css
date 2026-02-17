@@ -353,6 +353,7 @@ textarea {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+  align-items: start;
 }
 
 .compact-form .field {
@@ -364,6 +365,18 @@ textarea {
   gap: 6px;
   font-size: 14px;
   color: var(--muted);
+  align-self: start;
+}
+
+.field > span {
+  min-height: 20px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.field input,
+.field select {
+  min-height: 40px;
 }
 
 .field-compact input,
