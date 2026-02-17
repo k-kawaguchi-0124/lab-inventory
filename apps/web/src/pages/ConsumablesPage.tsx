@@ -32,6 +32,7 @@ export function ConsumablesPage() {
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
   const [newCategory, setNewCategory] = useState("");
+  const [showNewCategory, setShowNewCategory] = useState(false);
   const [unit, setUnit] = useState<"個" | "本">("個");
   const [currentQty, setCurrentQty] = useState("0");
   const [reorderThreshold, setReorderThreshold] = useState("0");
@@ -93,6 +94,7 @@ export function ConsumablesPage() {
     }
     setCategory(value);
     setNewCategory("");
+    setShowNewCategory(false);
   }
 
   async function createConsumable() {
@@ -360,15 +362,17 @@ export function ConsumablesPage() {
                 ...categories.map((c) => ({ value: c, label: c })),
               ]}
             />
-          </label>
-          <label className="field">
-            <span>カテゴリ新規登録</span>
-            <div className="form-row">
-              <input value={newCategory} onChange={(e) => setNewCategory(e.target.value)} placeholder="新しいカテゴリ名" />
-              <button className="btn btn-secondary" type="button" onClick={addCategory}>
-                追加
-              </button>
-            </div>
+            <button type="button" className="link-inline-btn" onClick={() => setShowNewCategory((v) => !v)}>
+              {showNewCategory ? "カテゴリ追加を閉じる" : "＋ 新しいカテゴリを追加"}
+            </button>
+            {showNewCategory && (
+              <div className="form-row">
+                <input value={newCategory} onChange={(e) => setNewCategory(e.target.value)} placeholder="新しいカテゴリ名" />
+                <button className="btn btn-secondary" type="button" onClick={addCategory}>
+                  追加
+                </button>
+              </div>
+            )}
           </label>
           <label className="field">
             <span>単位</span>

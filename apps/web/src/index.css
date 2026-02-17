@@ -415,6 +415,22 @@ select option {
   align-items: center;
 }
 
+.link-inline-btn {
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  font: inherit;
+  font-weight: 700;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.link-inline-btn:hover {
+  color: var(--primary-strong);
+  text-decoration: underline;
+}
+
 .field input,
 .field select {
   min-height: 40px;

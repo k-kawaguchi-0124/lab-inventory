@@ -18,6 +18,8 @@ export function AssetCreatePage() {
   const [newCategory, setNewCategory] = useState("");
   const [budgetCode, setBudgetCode] = useState("");
   const [newBudget, setNewBudget] = useState("");
+  const [showNewCategory, setShowNewCategory] = useState(false);
+  const [showNewBudget, setShowNewBudget] = useState(false);
   const [purchasedAt, setPurchasedAt] = useState("");
   const [locationId, setLocationId] = useState("");
   const [newLocation, setNewLocation] = useState("");
@@ -53,6 +55,7 @@ export function AssetCreatePage() {
     }
     setCategory(value);
     setNewCategory("");
+    setShowNewCategory(false);
   }
 
   function addBudget() {
@@ -63,6 +66,7 @@ export function AssetCreatePage() {
     }
     setBudgetCode(value);
     setNewBudget("");
+    setShowNewBudget(false);
   }
 
   async function addLocation() {
@@ -170,19 +174,21 @@ export function AssetCreatePage() {
               ...categories.map((c) => ({ value: c, label: c })),
             ]}
           />
-        </label>
-        <label className="field">
-          <span>カテゴリ新規登録</span>
-          <div className="form-row">
-            <input
-              value={newCategory}
-              onChange={(e) => setNewCategory(e.target.value)}
-              placeholder="新しいカテゴリ名"
-            />
-            <button type="button" className="btn btn-secondary" onClick={addCategory}>
-              追加
-            </button>
-          </div>
+          <button type="button" className="link-inline-btn" onClick={() => setShowNewCategory((v) => !v)}>
+            {showNewCategory ? "カテゴリ追加を閉じる" : "＋ 新しいカテゴリを追加"}
+          </button>
+          {showNewCategory && (
+            <div className="form-row">
+              <input
+                value={newCategory}
+                onChange={(e) => setNewCategory(e.target.value)}
+                placeholder="新しいカテゴリ名"
+              />
+              <button type="button" className="btn btn-secondary" onClick={addCategory}>
+                追加
+              </button>
+            </div>
+          )}
         </label>
         <label className="field field-compact">
           <span>予算</span>
@@ -194,19 +200,21 @@ export function AssetCreatePage() {
               ...budgets.map((b) => ({ value: b, label: b })),
             ]}
           />
-        </label>
-        <label className="field field-compact">
-          <span>予算新規登録</span>
-          <div className="form-row">
-            <input
-              value={newBudget}
-              onChange={(e) => setNewBudget(e.target.value)}
-              placeholder="新しい予算名"
-            />
-            <button type="button" className="btn btn-secondary" onClick={addBudget}>
-              追加
-            </button>
-          </div>
+          <button type="button" className="link-inline-btn" onClick={() => setShowNewBudget((v) => !v)}>
+            {showNewBudget ? "予算追加を閉じる" : "＋ 新しい予算を追加"}
+          </button>
+          {showNewBudget && (
+            <div className="form-row">
+              <input
+                value={newBudget}
+                onChange={(e) => setNewBudget(e.target.value)}
+                placeholder="新しい予算名"
+              />
+              <button type="button" className="btn btn-secondary" onClick={addBudget}>
+                追加
+              </button>
+            </div>
+          )}
         </label>
         <label className="field field-compact">
           <span>購入日</span>
