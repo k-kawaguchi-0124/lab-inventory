@@ -297,6 +297,43 @@ textarea {
   color: var(--text);
   font: inherit;
   padding: 10px 12px;
+  transition: border-color 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+}
+
+input:hover,
+select:hover,
+textarea:hover {
+  border-color: #b8c8e4;
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  border-color: #7ca8ef;
+  box-shadow: 0 0 0 3px rgba(31, 111, 235, 0.16);
+}
+
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding-right: 38px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #5a6a86 50%),
+    linear-gradient(135deg, #5a6a86 50%, transparent 50%),
+    linear-gradient(to right, #dbe4f3, #dbe4f3);
+  background-position:
+    calc(100% - 16px) calc(50% - 1px),
+    calc(100% - 11px) calc(50% - 1px),
+    calc(100% - 30px) 50%;
+  background-size: 5px 5px, 5px 5px, 1px 18px;
+  background-repeat: no-repeat;
+}
+
+select option {
+  color: var(--text);
+  background: #fff;
 }
 
 .input {
