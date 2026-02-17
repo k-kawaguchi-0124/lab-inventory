@@ -345,6 +345,15 @@ textarea {
   color: var(--muted);
 }
 
+.field-inline input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0 4px 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+}
+
 .field-inline input,
 .field-inline select {
   min-width: 90px;
