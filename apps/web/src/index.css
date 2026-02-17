@@ -436,6 +436,10 @@ select option {
   min-height: 40px;
 }
 
+.field input[type="date"] {
+  width: 100%;
+}
+
 .field-compact input,
 .field-compact select,
 .field-compact textarea {
