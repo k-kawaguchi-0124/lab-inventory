@@ -167,6 +167,88 @@ docker compose -f docker/docker-compose.dev.yml up -d
 
 以降は「ローカル開発手順」の API/Web 起動手順と同じです。
 
+## systemd で常駐運用（nohup 代替）
+
+`deploy/systemd` に API/Web のユニットファイルと補助スクリプトを用意しています。
+
+### 1. サービスインストール
+
+```bash
+cd /opt/lab-inventory
+./deploy/systemd/install-services.sh
+```
+
+### 2. 起動・停止
+
+```bash
+sudo systemctl start lab-inventory-api.service
+sudo systemctl start lab-inventory-web.service
+
+sudo systemctl stop lab-inventory-api.service
+sudo systemctl stop lab-inventory-web.service
+```
+
+### 3. 状態とログ確認
+
+```bash
+systemctl status lab-inventory-api.service --no-pager
+systemctl status lab-inventory-web.service --no-pager
+
+journalctl -u lab-inventory-api.service -f
+journalctl -u lab-inventory-web.service -f
+```
+
+### 4. 更新反映（pull + install + migrate + restart）
+
+```bash
+cd /opt/lab-inventory
+./deploy/systemd/update-and-restart.sh
+```
+
+## 起動時の操作（運用手順）
+
+サーバ再起動後や日次運用で、最低限この手順を実行してください。
+
+### 1. Docker（DB/MinIO）を起動
+
+```bash
+sudo systemctl start docker
+cd /opt/lab-inventory
+docker compose -f docker/docker-compose.dev.yml up -d
+```
+
+### 2. アプリ（API/Web）を起動
+
+systemd 運用の場合:
+
+```bash
+sudo systemctl start lab-inventory-api.service
+sudo systemctl start lab-inventory-web.service
+```
+
+### 3. ヘルスチェック
+
+```bash
+curl http://localhost:3000/health
+systemctl status lab-inventory-api.service --no-pager
+systemctl status lab-inventory-web.service --no-pager
+ss -ltnp | grep -E '3000|5173'
+```
+
+### 4. 反映作業時（更新手順）
+
+```bash
+cd /opt/lab-inventory
+./deploy/systemd/update-and-restart.sh
+```
+
+### 5. トラブル時ログ確認
+
+```bash
+journalctl -u lab-inventory-api.service -n 100 --no-pager
+journalctl -u lab-inventory-web.service -n 100 --no-pager
+```
+
 ## 主要 API エンドポイント（抜粋）
 
 ```text
