@@ -230,9 +230,6 @@ export function AssetCreatePage() {
             required
             options={locations.map((loc) => ({ value: loc.id, label: loc.name }))}
           />
-        </label>
-        <label className="field">
-          <span>保管場所新規登録</span>
           <button type="button" className="link-inline-btn" onClick={() => setShowNewLocation((v) => !v)}>
             {showNewLocation ? "保管場所追加を閉じる" : "＋ 新しい保管場所を追加"}
           </button>
