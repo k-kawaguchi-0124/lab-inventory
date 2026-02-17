@@ -97,6 +97,10 @@ export function AssetCheckoutPage() {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
+    if (!assetId) {
+      setError("貸出する備品を候補から選択してください");
+      return;
+    }
     setLoading(true);
     setError(null);
     setMessage(null);
@@ -124,7 +128,7 @@ export function AssetCheckoutPage() {
   return (
     <section className="panel">
       <h1 className="panel-title">備品の貸出</h1>
-      <p className="panel-subtitle">名称/シリアルで候補を選ぶか、備品IDを直接入力して貸出を更新します。</p>
+      <p className="panel-subtitle">名称/シリアルで候補を選んで貸出を更新します。</p>
 
       <form className="form-grid" onSubmit={onSubmit}>
         <label className="field field-full">
@@ -154,10 +158,7 @@ export function AssetCheckoutPage() {
               ))}
             </div>
           )}
-        </label>
-        <label className="field field-full">
-          <span>備品ID</span>
-          <input value={assetId} onChange={(e) => setAssetId(e.target.value)} required placeholder="cuid..." />
+          {assetId && <small>選択済みの備品ID: {assetId}</small>}
         </label>
         <label className="field">
           <span>貸出先ユーザー</span>
