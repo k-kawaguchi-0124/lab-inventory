@@ -51,6 +51,10 @@ function formatSerial(prefix: string, seq: number) {
   return `${body}-${calcCheckDigit(body)}`;
 }
 
+function uniqueSorted(values: string[]) {
+  return [...new Set(values.map((v) => v.trim()).filter((v) => v.length > 0))].sort((a, b) => a.localeCompare(b, "ja"));
+}
+
 app.get("/health", async () => ({ ok: true }));
 
 app.get("/users", async () => {
@@ -142,34 +146,342 @@ app.delete("/users/:id", async (req, reply) => {
 });
 
 app.get("/asset-categories", async () => {
-  const rows = await prisma.asset.findMany({
-    select: { category: true },
-    distinct: ["category"],
-    orderBy: { category: "asc" },
-    take: 500,
-  });
-  return { items: rows.map((x) => x.category) };
+  const [masterRows, assetRows] = await Promise.all([
+    prisma.assetCategoryMaster.findMany({
+      select: { name: true },
+      orderBy: { name: "asc" },
+      take: 1000,
+    }),
+    prisma.asset.findMany({
+      select: { category: true },
+      distinct: ["category"],
+      orderBy: { category: "asc" },
+      take: 1000,
+    }),
+  ]);
+  return { items: uniqueSorted([...masterRows.map((x) => x.name), ...assetRows.map((x) => x.category)]) };
 });
 
 app.get("/asset-budgets", async () => {
-  const rows = await prisma.asset.findMany({
-    where: { budgetCode: { not: null } },
-    select: { budgetCode: true },
-    distinct: ["budgetCode"],
-    orderBy: { budgetCode: "asc" },
-    take: 500,
-  });
-  return { items: rows.map((x) => x.budgetCode).filter((x): x is string => Boolean(x && x.trim())) };
+  const [masterRows, assetRows] = await Promise.all([
+    prisma.assetBudgetMaster.findMany({
+      select: { name: true },
+      orderBy: { name: "asc" },
+      take: 1000,
+    }),
+    prisma.asset.findMany({
+      where: { budgetCode: { not: null } },
+      select: { budgetCode: true },
+      distinct: ["budgetCode"],
+      orderBy: { budgetCode: "asc" },
+      take: 1000,
+    }),
+  ]);
+  return {
+    items: uniqueSorted([
+      ...masterRows.map((x) => x.name),
+      ...assetRows.map((x) => x.budgetCode).filter((x): x is string => Boolean(x && x.trim())),
+    ]),
+  };
 });
 
 app.get("/consumable-categories", async () => {
-  const rows = await prisma.consumable.findMany({
-    select: { category: true },
-    distinct: ["category"],
-    orderBy: { category: "asc" },
-    take: 500,
+  const [masterRows, consumableRows] = await Promise.all([
+    prisma.consumableCategoryMaster.findMany({
+      select: { name: true },
+      orderBy: { name: "asc" },
+      take: 1000,
+    }),
+    prisma.consumable.findMany({
+      select: { category: true },
+      distinct: ["category"],
+      orderBy: { category: "asc" },
+      take: 1000,
+    }),
+  ]);
+  return { items: uniqueSorted([...masterRows.map((x) => x.name), ...consumableRows.map((x) => x.category)]) };
+});
+
+app.get("/masters", async () => {
+  const [
+    assetCategoryMasters,
+    assetCategoriesInUse,
+    assetBudgetMasters,
+    assetBudgetsInUse,
+    consumableCategoryMasters,
+    consumableCategoriesInUse,
+    locations,
+    assetLocationCounts,
+    consumableLocationCounts,
+    locationChildrenCounts,
+  ] = await Promise.all([
+    prisma.assetCategoryMaster.findMany({ select: { name: true }, orderBy: { name: "asc" }, take: 2000 }),
+    prisma.asset.groupBy({ by: ["category"], _count: { _all: true } }),
+    prisma.assetBudgetMaster.findMany({ select: { name: true }, orderBy: { name: "asc" }, take: 2000 }),
+    prisma.asset.groupBy({
+      by: ["budgetCode"],
+      where: { budgetCode: { not: null } },
+      _count: { _all: true },
+    }),
+    prisma.consumableCategoryMaster.findMany({ select: { name: true }, orderBy: { name: "asc" }, take: 2000 }),
+    prisma.consumable.groupBy({ by: ["category"], _count: { _all: true } }),
+    prisma.location.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" }, take: 2000 }),
+    prisma.asset.groupBy({ by: ["currentLocationId"], _count: { _all: true } }),
+    prisma.consumable.groupBy({ by: ["locationId"], _count: { _all: true } }),
+    prisma.location.groupBy({ by: ["parentId"], where: { parentId: { not: null } }, _count: { _all: true } }),
+  ]);
+
+  const assetCategoryUseMap = new Map(assetCategoriesInUse.map((x) => [x.category, x._count._all]));
+  const assetBudgetUseMap = new Map(
+    assetBudgetsInUse
+      .filter((x) => x.budgetCode && x.budgetCode.trim().length > 0)
+      .map((x) => [x.budgetCode as string, x._count._all]),
+  );
+  const consumableCategoryUseMap = new Map(consumableCategoriesInUse.map((x) => [x.category, x._count._all]));
+  const assetLocationCountMap = new Map(assetLocationCounts.map((x) => [x.currentLocationId, x._count._all]));
+  const consumableLocationCountMap = new Map(consumableLocationCounts.map((x) => [x.locationId, x._count._all]));
+  const locationChildrenCountMap = new Map(
+    locationChildrenCounts
+      .filter((x) => x.parentId)
+      .map((x) => [x.parentId as string, x._count._all]),
+  );
+
+  const assetCategoryNames = uniqueSorted([...assetCategoryMasters.map((x) => x.name), ...assetCategoryUseMap.keys()]);
+  const assetBudgetNames = uniqueSorted([...assetBudgetMasters.map((x) => x.name), ...assetBudgetUseMap.keys()]);
+  const consumableCategoryNames = uniqueSorted([
+    ...consumableCategoryMasters.map((x) => x.name),
+    ...consumableCategoryUseMap.keys(),
+  ]);
+
+  return {
+    assetCategories: assetCategoryNames.map((name) => ({ name, usageCount: assetCategoryUseMap.get(name) ?? 0 })),
+    assetBudgets: assetBudgetNames.map((name) => ({ name, usageCount: assetBudgetUseMap.get(name) ?? 0 })),
+    consumableCategories: consumableCategoryNames.map((name) => ({ name, usageCount: consumableCategoryUseMap.get(name) ?? 0 })),
+    locations: locations.map((loc) => ({
+      id: loc.id,
+      name: loc.name,
+      assetCount: assetLocationCountMap.get(loc.id) ?? 0,
+      consumableCount: consumableLocationCountMap.get(loc.id) ?? 0,
+      childCount: locationChildrenCountMap.get(loc.id) ?? 0,
+    })),
+  };
+});
+
+app.post("/masters/asset-categories", async (req, reply) => {
+  const body = z.object({ name: z.string().min(1) }).parse(req.body);
+  try {
+    const created = await prisma.assetCategoryMaster.create({
+      data: { name: body.name.trim() },
+      select: { id: true, name: true },
+    });
+    return reply.status(201).send(created);
+  } catch (e: any) {
+    if (e?.code === "P2002") return reply.status(409).send({ error: "Category already exists." });
+    throw e;
+  }
+});
+
+app.put("/masters/asset-categories", async (req, reply) => {
+  const body = z.object({ from: z.string().min(1), to: z.string().min(1) }).parse(req.body);
+  const from = body.from.trim();
+  const to = body.to.trim();
+  if (from === to) return reply.send({ ok: true });
+
+  const [usageCount, masterExists] = await Promise.all([
+    prisma.asset.count({ where: { category: from } }),
+    prisma.assetCategoryMaster.count({ where: { name: from } }),
+  ]);
+  if (usageCount === 0 && masterExists === 0) return reply.status(404).send({ error: "Category not found." });
+
+  await prisma.$transaction(async (tx) => {
+    await tx.asset.updateMany({
+      where: { category: from },
+      data: { category: to, lastActivityAt: new Date() },
+    });
+    await tx.assetCategoryMaster.deleteMany({ where: { name: from } });
+    await tx.assetCategoryMaster.upsert({
+      where: { name: to },
+      update: {},
+      create: { name: to },
+    });
   });
-  return { items: rows.map((x) => x.category) };
+
+  return reply.send({ ok: true });
+});
+
+app.delete("/masters/asset-categories/:name", async (req, reply) => {
+  const params = z.object({ name: z.string().min(1) }).parse(req.params);
+  const name = decodeURIComponent(params.name).trim();
+  const usageCount = await prisma.asset.count({ where: { category: name } });
+  if (usageCount > 0) {
+    return reply.status(400).send({ error: "Category is in use by assets." });
+  }
+  await prisma.assetCategoryMaster.deleteMany({ where: { name } });
+  return reply.send({ ok: true });
+});
+
+app.post("/masters/asset-budgets", async (req, reply) => {
+  const body = z.object({ name: z.string().min(1) }).parse(req.body);
+  try {
+    const created = await prisma.assetBudgetMaster.create({
+      data: { name: body.name.trim() },
+      select: { id: true, name: true },
+    });
+    return reply.status(201).send(created);
+  } catch (e: any) {
+    if (e?.code === "P2002") return reply.status(409).send({ error: "Budget already exists." });
+    throw e;
+  }
+});
+
+app.put("/masters/asset-budgets", async (req, reply) => {
+  const body = z.object({ from: z.string().min(1), to: z.string().min(1) }).parse(req.body);
+  const from = body.from.trim();
+  const to = body.to.trim();
+  if (from === to) return reply.send({ ok: true });
+
+  const [usageCount, masterExists] = await Promise.all([
+    prisma.asset.count({ where: { budgetCode: from } }),
+    prisma.assetBudgetMaster.count({ where: { name: from } }),
+  ]);
+  if (usageCount === 0 && masterExists === 0) return reply.status(404).send({ error: "Budget not found." });
+
+  await prisma.$transaction(async (tx) => {
+    await tx.asset.updateMany({
+      where: { budgetCode: from },
+      data: { budgetCode: to, lastActivityAt: new Date() },
+    });
+    await tx.assetBudgetMaster.deleteMany({ where: { name: from } });
+    await tx.assetBudgetMaster.upsert({
+      where: { name: to },
+      update: {},
+      create: { name: to },
+    });
+  });
+
+  return reply.send({ ok: true });
+});
+
+app.delete("/masters/asset-budgets/:name", async (req, reply) => {
+  const params = z.object({ name: z.string().min(1) }).parse(req.params);
+  const name = decodeURIComponent(params.name).trim();
+  const usageCount = await prisma.asset.count({ where: { budgetCode: name } });
+  if (usageCount > 0) {
+    return reply.status(400).send({ error: "Budget is in use by assets." });
+  }
+  await prisma.assetBudgetMaster.deleteMany({ where: { name } });
+  return reply.send({ ok: true });
+});
+
+app.post("/masters/consumable-categories", async (req, reply) => {
+  const body = z.object({ name: z.string().min(1) }).parse(req.body);
+  try {
+    const created = await prisma.consumableCategoryMaster.create({
+      data: { name: body.name.trim() },
+      select: { id: true, name: true },
+    });
+    return reply.status(201).send(created);
+  } catch (e: any) {
+    if (e?.code === "P2002") return reply.status(409).send({ error: "Category already exists." });
+    throw e;
+  }
+});
+
+app.put("/masters/consumable-categories", async (req, reply) => {
+  const body = z.object({ from: z.string().min(1), to: z.string().min(1) }).parse(req.body);
+  const from = body.from.trim();
+  const to = body.to.trim();
+  if (from === to) return reply.send({ ok: true });
+
+  const [usageCount, masterExists] = await Promise.all([
+    prisma.consumable.count({ where: { category: from } }),
+    prisma.consumableCategoryMaster.count({ where: { name: from } }),
+  ]);
+  if (usageCount === 0 && masterExists === 0) return reply.status(404).send({ error: "Category not found." });
+
+  await prisma.$transaction(async (tx) => {
+    await tx.consumable.updateMany({
+      where: { category: from },
+      data: { category: to, lastActivityAt: new Date() },
+    });
+    await tx.consumableCategoryMaster.deleteMany({ where: { name: from } });
+    await tx.consumableCategoryMaster.upsert({
+      where: { name: to },
+      update: {},
+      create: { name: to },
+    });
+  });
+
+  return reply.send({ ok: true });
+});
+
+app.delete("/masters/consumable-categories/:name", async (req, reply) => {
+  const params = z.object({ name: z.string().min(1) }).parse(req.params);
+  const name = decodeURIComponent(params.name).trim();
+  const usageCount = await prisma.consumable.count({ where: { category: name } });
+  if (usageCount > 0) {
+    return reply.status(400).send({ error: "Category is in use by consumables." });
+  }
+  await prisma.consumableCategoryMaster.deleteMany({ where: { name } });
+  return reply.send({ ok: true });
+});
+
+app.post("/masters/locations", async (req, reply) => {
+  const body = z
+    .object({
+      name: z.string().min(1),
+      note: z.string().optional(),
+      parentId: z.string().optional(),
+    })
+    .parse(req.body);
+
+  const created = await prisma.location.create({
+    data: {
+      name: body.name.trim(),
+      ...(body.note ? { note: body.note } : {}),
+      ...(body.parentId ? { parentId: body.parentId } : {}),
+    },
+    select: { id: true, name: true },
+  });
+  return reply.status(201).send(created);
+});
+
+app.put("/masters/locations/:id", async (req, reply) => {
+  const params = z.object({ id: z.string().min(1) }).parse(req.params);
+  const body = z
+    .object({
+      name: z.string().min(1),
+      note: z.string().nullable().optional(),
+      parentId: z.string().nullable().optional(),
+    })
+    .parse(req.body);
+
+  const updated = await prisma.location.update({
+    where: { id: params.id },
+    data: {
+      name: body.name.trim(),
+      ...(body.note !== undefined ? { note: body.note } : {}),
+      ...(body.parentId !== undefined ? { parentId: body.parentId } : {}),
+    },
+    select: { id: true, name: true },
+  });
+  return reply.send(updated);
+});
+
+app.delete("/masters/locations/:id", async (req, reply) => {
+  const params = z.object({ id: z.string().min(1) }).parse(req.params);
+
+  const [assetCount, consumableCount, childCount] = await Promise.all([
+    prisma.asset.count({ where: { currentLocationId: params.id } }),
+    prisma.consumable.count({ where: { locationId: params.id } }),
+    prisma.location.count({ where: { parentId: params.id } }),
+  ]);
+  if (assetCount > 0 || consumableCount > 0 || childCount > 0) {
+    return reply.status(400).send({ error: "Location is in use and cannot be deleted." });
+  }
+
+  await prisma.location.delete({ where: { id: params.id } });
+  return reply.send({ ok: true });
 });
 
 app.post("/consumables", async (req, reply) => {
@@ -203,6 +515,12 @@ app.post("/consumables", async (req, reply) => {
   const actorId = await getSystemUserId();
 
   const created = await prisma.$transaction(async (tx) => {
+    await tx.consumableCategoryMaster.upsert({
+      where: { name: body.category },
+      update: {},
+      create: { name: body.category },
+    });
+
     const consumable = await tx.consumable.create({
       data: {
         serial: body.serial,
@@ -468,6 +786,19 @@ app.post("/assets", async (req, reply) => {
   }
 
   const asset = await prisma.$transaction(async (tx) => {
+    await tx.assetCategoryMaster.upsert({
+      where: { name: body.category },
+      update: {},
+      create: { name: body.category },
+    });
+    if (body.budgetCode && body.budgetCode.trim().length > 0) {
+      await tx.assetBudgetMaster.upsert({
+        where: { name: body.budgetCode.trim() },
+        update: {},
+        create: { name: body.budgetCode.trim() },
+      });
+    }
+
     const created = await tx.asset.create({
       data: {
         serial: body.serial,
@@ -718,9 +1049,25 @@ app.put("/assets/:id", async (req, reply) => {
 
     const data: any = { lastActivityAt: new Date() };
     if (body.name !== undefined) data.name = body.name;
-    if (body.category !== undefined) data.category = body.category;
+    if (body.category !== undefined) {
+      await tx.assetCategoryMaster.upsert({
+        where: { name: body.category },
+        update: {},
+        create: { name: body.category },
+      });
+      data.category = body.category;
+    }
     if (body.locationId !== undefined) data.currentLocationId = body.locationId;
-    if (body.budgetCode !== undefined) data.budgetCode = body.budgetCode;
+    if (body.budgetCode !== undefined) {
+      if (body.budgetCode && body.budgetCode.trim().length > 0) {
+        await tx.assetBudgetMaster.upsert({
+          where: { name: body.budgetCode.trim() },
+          update: {},
+          create: { name: body.budgetCode.trim() },
+        });
+      }
+      data.budgetCode = body.budgetCode;
+    }
     if (body.purchasedAt !== undefined) data.purchasedAt = body.purchasedAt;
     if (body.note !== undefined) data.note = body.note;
 

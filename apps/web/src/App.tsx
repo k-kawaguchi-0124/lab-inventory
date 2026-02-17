@@ -11,6 +11,7 @@ import { AssetEditPage } from "./pages/AssetEditPage";
 import { UsersPage } from "./pages/UsersPage";
 import { AssetSearchPage } from "./pages/AssetSearchPage";
 import { ConsumablesPage } from "./pages/ConsumablesPage";
+import { MastersPage } from "./pages/MastersPage";
 
 function AppLayout() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -41,9 +42,6 @@ function AppLayout() {
           </button>
 
           <nav className={`topnav ${menuOpen ? "open" : ""}`}>
-            <NavLink to="/stale" className="topnav-link">
-              長期未更新
-            </NavLink>
             <NavLink to="/assets" end className="topnav-link">
               物品一覧
             </NavLink>
@@ -53,8 +51,14 @@ function AppLayout() {
             <NavLink to="/consumables" className="topnav-link">
               消耗品
             </NavLink>
+            <NavLink to="/stale" className="topnav-link">
+              長期未更新
+            </NavLink>
             <NavLink to="/users" className="topnav-link">
               ユーザ
+            </NavLink>
+            <NavLink to="/masters" className="topnav-link">
+              マスタ管理
             </NavLink>
           </nav>
         </div>
@@ -72,6 +76,7 @@ function AppLayout() {
           <Route path="/assets/move" element={<AssetMovePage />} />
           <Route path="/consumables" element={<ConsumablesPage />} />
           <Route path="/users" element={<UsersPage />} />
+          <Route path="/masters" element={<MastersPage />} />
         </Routes>
       </main>
     </div>

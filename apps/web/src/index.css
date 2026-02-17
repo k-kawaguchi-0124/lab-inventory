@@ -742,6 +742,12 @@ select option {
   box-shadow: none;
 }
 
+.master-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 @media (max-width: 900px) {
   .stat-grid,
   .action-grid,
