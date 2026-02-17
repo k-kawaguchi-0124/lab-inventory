@@ -24,6 +24,7 @@ export function AssetSearchPage() {
   const [selectedAssetId, setSelectedAssetId] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
 
   const query = searchParams.get("query")?.trim() ?? "";
   const status = searchParams.get("status")?.trim() ?? "";
@@ -52,6 +53,22 @@ export function AssetSearchPage() {
       .finally(() => setLoading(false));
   }, [url]);
 
+  async function reload() {
+    setLoading(true);
+    setError(null);
+    try {
+      const r = await fetch(url);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const json = (await r.json()) as Asset[];
+      setItems(json);
+    } catch (e: any) {
+      setError(e?.message ?? "読み込みに失敗しました");
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   useEffect(() => {
     if (items.length === 0) {
       setSelectedAssetId("");
@@ -68,6 +85,26 @@ export function AssetSearchPage() {
     if (q) params.set("query", q);
     else params.delete("query");
     setSearchParams(params);
+  }
+
+  async function onDeleteSelected() {
+    if (!selectedAsset) return;
+    const ok = window.confirm(`物品「${selectedAsset.name}」を削除しますか？この操作は元に戻せません。`);
+    if (!ok) return;
+    setActionLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(apiUrl(`/assets/${selectedAsset.id}`), { method: "DELETE" });
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson?.error ?? `HTTP ${res.status}`);
+      }
+      await reload();
+    } catch (e: any) {
+      setError(e?.message ?? "削除に失敗しました");
+    } finally {
+      setActionLoading(false);
+    }
   }
 
   const selectedAsset = items.find((x) => x.id === selectedAssetId) ?? null;
@@ -113,6 +150,15 @@ export function AssetSearchPage() {
               <Link className="btn btn-secondary" to={`/assets/checkin?assetId=${selectedAsset.id}`}>
                 返却
               </Link>
+              <button
+                className="btn btn-secondary"
+                type="button"
+                onClick={onDeleteSelected}
+                disabled={actionLoading || selectedAsset.status === "CHECKED_OUT"}
+                title={selectedAsset.status === "CHECKED_OUT" ? "貸出中は削除できません" : undefined}
+              >
+                削除
+              </button>
             </div>
           </>
         ) : (

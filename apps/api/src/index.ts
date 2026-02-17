@@ -1095,6 +1095,46 @@ app.put("/assets/:id", async (req, reply) => {
   return reply.send(result);
 });
 
+app.delete("/assets/:id", async (req, reply) => {
+  const params = z.object({ id: z.string().min(1) }).parse(req.params);
+  const actorId = await getSystemUserId();
+
+  const result = await prisma.$transaction(async (tx) => {
+    const current = await tx.asset.findUnique({
+      where: { id: params.id },
+      select: { id: true, status: true, currentLocationId: true, currentUserId: true },
+    });
+    if (!current) {
+      reply.status(404);
+      return { error: "Asset not found." };
+    }
+    if (current.status === "CHECKED_OUT") {
+      reply.status(400);
+      return { error: "Checked-out asset cannot be deleted. Check in first." };
+    }
+
+    await tx.activityLog.create({
+      data: {
+        actorId,
+        targetType: "ASSET",
+        targetId: current.id,
+        action: "STATUS_CHANGE",
+        fromLocationId: current.currentLocationId,
+        toLocationId: current.currentLocationId,
+        fromUserId: current.currentUserId,
+        toUserId: current.currentUserId,
+        note: "asset deleted",
+      },
+    });
+
+    await tx.asset.delete({ where: { id: params.id } });
+    return { ok: true };
+  });
+
+  if ("error" in result) return reply.send(result);
+  return reply.send(result);
+});
+
 // 開発検証用: 最終更新日時を過去日に変更
 app.post("/dev/assets/:id/backdate", async (req, reply) => {
   const params = z.object({ id: z.string().min(1) }).parse(req.params);

@@ -9,6 +9,7 @@ type Asset = {
   serial: string;
   name: string;
   category: string;
+  status: string;
   budgetCode: string | null;
   purchasedAt: string | null;
   note: string | null;
@@ -154,6 +155,27 @@ export function AssetEditPage() {
     }
   }
 
+  async function onDelete() {
+    if (!id) return;
+    const ok = window.confirm(`物品「${asset?.name ?? ""}」を削除しますか？この操作は元に戻せません。`);
+    if (!ok) return;
+    setLoading(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch(apiUrl(`/assets/${id}`), { method: "DELETE" });
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson?.error ?? `HTTP ${res.status}`);
+      }
+      navigate("/assets");
+    } catch (err: any) {
+      setError(err?.message ?? "削除に失敗しました");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   if (!id) return <section className="panel">IDが指定されていません</section>;
 
   return (
@@ -255,6 +277,15 @@ export function AssetEditPage() {
         <div className="field-full form-row">
           <button className="btn btn-primary" type="submit" disabled={loading}>
             保存
+          </button>
+          <button
+            className="btn btn-secondary"
+            type="button"
+            onClick={onDelete}
+            disabled={loading || asset?.status === "CHECKED_OUT"}
+            title={asset?.status === "CHECKED_OUT" ? "貸出中は削除できません" : undefined}
+          >
+            削除
           </button>
           <button className="btn btn-secondary" type="button" onClick={() => navigate("/assets")}>
             一覧に戻る
