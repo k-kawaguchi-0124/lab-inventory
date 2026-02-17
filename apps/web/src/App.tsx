@@ -23,7 +23,7 @@ export default function App() {
               <NavLink to="/stale" className="topnav-link">
                 長期未更新
               </NavLink>
-              <NavLink to="/assets" className="topnav-link">
+              <NavLink to="/assets" end className="topnav-link">
                 物品一覧
               </NavLink>
               <NavLink to="/assets/new" className="topnav-link">

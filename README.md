@@ -242,6 +242,61 @@ cd /opt/lab-inventory
 ./deploy/systemd/update-and-restart.sh
 ```
 
+## Git 更新をサーバへ反映する手順
+
+ローカル開発PCでの作業と、サーバ反映作業を分けて実行します。
+
+### A. ローカル開発PC側（GitHubへ反映）
+
+```bash
+cd <your-local-repo>/lab-inventory
+git add -A
+git commit -m "your message"
+git push origin main
+```
+
+### B. サーバ側（GitHubの更新を取り込んで反映）
+
+```bash
+cd /opt/lab-inventory
+./deploy/systemd/update-and-restart.sh
+```
+
+このスクリプトは以下を自動実行します。
+
+- `git fetch` / `git pull --ff-only`
+- API/Web の `npm install`
+- `npx prisma migrate deploy`
+- `lab-inventory-api.service` / `lab-inventory-web.service` の再起動
+
+### C. 反映確認
+
+```bash
+curl http://localhost:3000/health
+systemctl status lab-inventory-api.service --no-pager
+systemctl status lab-inventory-web.service --no-pager
+```
+
+### D. systemd 未導入の場合（暫定）
+
+```bash
+cd /opt/lab-inventory
+git pull --ff-only origin main
+
+cd /opt/lab-inventory/apps/api && npm install
+cd /opt/lab-inventory/apps/web && npm install
+cd /opt/lab-inventory/apps/api && npx prisma migrate deploy
+
+pkill -f "tsx watch src/index.ts" || true
+pkill -f "vite --host 0.0.0.0 --port 5173" || true
+
+cd /opt/lab-inventory/apps/api
+nohup npm run dev > api.dev.log 2>&1 &
+
+cd /opt/lab-inventory/apps/web
+nohup npm run dev -- --host 0.0.0.0 --port 5173 > web.dev.log 2>&1 &
+```
+
 ### 5. トラブル時ログ確認
 
 ```bash
