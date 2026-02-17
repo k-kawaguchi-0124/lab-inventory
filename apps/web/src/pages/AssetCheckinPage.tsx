@@ -27,6 +27,7 @@ export function AssetCheckinPage() {
   const [assetId, setAssetId] = useState("");
   const [locationId, setLocationId] = useState("");
   const [newLocation, setNewLocation] = useState("");
+  const [showNewLocation, setShowNewLocation] = useState(false);
   const [note, setNote] = useState("");
   const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(false);
@@ -50,6 +51,7 @@ export function AssetCheckinPage() {
       setLocations(next);
       setLocationId(created.id);
       setNewLocation("");
+      setShowNewLocation(false);
     } catch (e: any) {
       setError(e?.message ?? "保管場所の追加に失敗しました");
     }
@@ -173,17 +175,22 @@ export function AssetCheckinPage() {
           />
         </label>
         <label className="field">
-          <span>保管場所新規登録</span>
-          <div className="form-row">
-            <input
-              value={newLocation}
-              onChange={(e) => setNewLocation(e.target.value)}
-              placeholder="新しい保管場所名"
-            />
-            <button type="button" className="btn btn-secondary" onClick={addLocation}>
-              追加
-            </button>
-          </div>
+          <span>保管場所</span>
+          <button type="button" className="link-inline-btn" onClick={() => setShowNewLocation((v) => !v)}>
+            {showNewLocation ? "保管場所追加を閉じる" : "＋ 新しい保管場所を追加"}
+          </button>
+          {showNewLocation && (
+            <div className="form-row">
+              <input
+                value={newLocation}
+                onChange={(e) => setNewLocation(e.target.value)}
+                placeholder="新しい保管場所名"
+              />
+              <button type="button" className="btn btn-secondary" onClick={addLocation}>
+                追加
+              </button>
+            </div>
+          )}
         </label>
         <label className="field field-full">
           <span>メモ</span>
