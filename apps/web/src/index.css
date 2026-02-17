@@ -370,6 +370,7 @@ textarea {
 
 .table-wrap {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .data-table {
@@ -492,5 +493,55 @@ textarea {
   .topbar-inner {
     flex-direction: column;
     align-items: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .page-container {
+    padding: 14px 12px 28px;
+  }
+
+  .panel {
+    padding: 12px;
+    border-radius: 12px;
+  }
+
+  .panel-title {
+    font-size: 18px;
+  }
+
+  .search-row,
+  .form-row {
+    align-items: stretch;
+  }
+
+  .search-row > *,
+  .form-row > * {
+    width: 100%;
+  }
+
+  .field-inline {
+    width: 100%;
+    gap: 6px;
+  }
+
+  .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .qty-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .qty-actions .btn {
+    width: 100%;
+    padding: 8px 10px;
+  }
+
+  .table-wide-user {
+    min-width: 900px;
   }
 }
