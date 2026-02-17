@@ -62,7 +62,7 @@ export function AssetListPage() {
           className="input"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="シリアル / 名称 / カテゴリ / 予算で絞り込み"
+          placeholder="名称 / シリアル / カテゴリ / 予算で絞り込み"
         />
         <select value={status} onChange={(e) => setStatus(e.target.value)}>
           <option value="">全ステータス</option>

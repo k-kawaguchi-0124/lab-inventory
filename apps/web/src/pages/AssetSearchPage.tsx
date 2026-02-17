@@ -82,7 +82,7 @@ export function AssetSearchPage() {
           className="input"
           value={queryInput}
           onChange={(e) => setQueryInput(e.target.value)}
-          placeholder="シリアル or 名前で検索"
+          placeholder="名称 or シリアルで検索"
           onKeyDown={(e) => {
             if (e.key === "Enter") runSearch();
           }}
@@ -101,7 +101,7 @@ export function AssetSearchPage() {
         {selectedAsset ? (
           <>
             <div>
-              <strong>選択中:</strong> {selectedAsset.serial} / {selectedAsset.name}
+              <strong>選択中:</strong> {selectedAsset.name} / {selectedAsset.serial}
             </div>
             <div className="row-actions">
               <Link className="btn btn-secondary" to={`/assets/${selectedAsset.id}/edit`}>

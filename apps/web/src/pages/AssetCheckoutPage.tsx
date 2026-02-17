@@ -123,15 +123,15 @@ export function AssetCheckoutPage() {
   return (
     <section className="panel">
       <h1 className="panel-title">備品の貸出</h1>
-      <p className="panel-subtitle">シリアル/名称で候補を選ぶか、備品IDを直接入力して貸出を更新します。</p>
+      <p className="panel-subtitle">名称/シリアルで候補を選ぶか、備品IDを直接入力して貸出を更新します。</p>
 
       <form className="form-grid" onSubmit={onSubmit}>
         <label className="field field-full">
-          <span>備品検索（シリアル / 名称）</span>
+          <span>備品検索（名称 / シリアル）</span>
           <input
             value={assetQuery}
             onChange={(e) => setAssetQuery(e.target.value)}
-            placeholder="例: 26000001 / Raspi4"
+            placeholder="例: Raspi4 / 26000001"
           />
           {candidateLoading && <small>候補を検索中...</small>}
           {!candidateLoading && assetCandidates.length > 0 && (
@@ -144,11 +144,11 @@ export function AssetCheckoutPage() {
                   style={{ textAlign: "left" }}
                   onClick={() => {
                     setAssetId(a.id);
-                    setAssetQuery(`${a.serial} / ${a.name}`);
+                    setAssetQuery(`${a.name} / ${a.serial}`);
                     setAssetCandidates([]);
                   }}
                 >
-                  {a.serial} | {a.name} ({a.status})
+                  {a.name} | {a.serial} ({a.status})
                 </button>
               ))}
             </div>

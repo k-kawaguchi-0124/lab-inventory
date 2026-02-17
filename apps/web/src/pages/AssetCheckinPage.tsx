@@ -155,7 +155,7 @@ export function AssetCheckinPage() {
             ) : (
               borrowedAssets.map((a) => (
                 <option key={a.id} value={a.id}>
-                  {a.serial} / {a.name}
+                  {a.name} / {a.serial}
                 </option>
               ))
             )}

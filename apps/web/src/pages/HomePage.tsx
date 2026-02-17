@@ -132,7 +132,7 @@ export function HomePage() {
               className="input"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="シリアル or 名前で検索"
+              placeholder="名称 or シリアルで検索"
               onKeyDown={(e) => {
                 if (e.key === "Enter") onSearch();
               }}
@@ -151,8 +151,8 @@ export function HomePage() {
                       navigate(`/assets/search?query=${encodeURIComponent(c.serial)}`);
                     }}
                   >
-                    <span className="mono">{c.serial}</span>
                     <span>{c.name}</span>
+                    <span className="mono">{c.serial}</span>
                     <span>{c.status}</span>
                   </button>
                 ))}
