@@ -175,9 +175,9 @@ app.post("/consumables", async (req, reply) => {
       serial: z.string().min(3),
       name: z.string().min(1),
       category: z.string().min(1),
-      unit: z.string().min(1),
-      currentQty: z.coerce.number().min(0),
-      reorderThreshold: z.coerce.number().min(0),
+      unit: z.enum(["個", "本"]),
+      currentQty: z.coerce.number().int().min(0),
+      reorderThreshold: z.coerce.number().int().min(0),
       locationId: z.string().min(1),
       note: z.string().optional(),
     })
@@ -278,7 +278,7 @@ app.post("/consumables/:id/adjust", async (req, reply) => {
   const params = z.object({ id: z.string().min(1) }).parse(req.params);
   const body = z
     .object({
-      delta: z.coerce.number(),
+      delta: z.coerce.number().int(),
       note: z.string().optional(),
     })
     .parse(req.body);

@@ -31,10 +31,11 @@ export function ConsumablesPage() {
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
   const [newCategory, setNewCategory] = useState("");
-  const [unit, setUnit] = useState("個");
+  const [unit, setUnit] = useState<"個" | "本">("個");
   const [currentQty, setCurrentQty] = useState("0");
   const [reorderThreshold, setReorderThreshold] = useState("0");
   const [locationId, setLocationId] = useState("");
+  const [newLocation, setNewLocation] = useState("");
   const [note, setNote] = useState("");
 
   const [loading, setLoading] = useState(false);
@@ -100,6 +101,16 @@ export function ConsumablesPage() {
       setError("必須項目を入力してください");
       return;
     }
+    const parsedCurrentQty = Number(currentQty || 0);
+    const parsedThreshold = Number(reorderThreshold || 0);
+    if (!Number.isInteger(parsedCurrentQty) || parsedCurrentQty < 0) {
+      setError("現在数量は0以上の整数で入力してください");
+      return;
+    }
+    if (!Number.isInteger(parsedThreshold) || parsedThreshold < 0) {
+      setError("発注目安は0以上の整数で入力してください");
+      return;
+    }
     try {
       const reserveRes = await fetch(apiUrl("/serials/reserve?type=CONSUMABLE"), { method: "POST" });
       if (!reserveRes.ok) throw new Error(`reserve HTTP ${reserveRes.status}`);
@@ -112,9 +123,9 @@ export function ConsumablesPage() {
           serial: reserveJson.serial,
           name: name.trim(),
           category: category.trim(),
-          unit: unit.trim(),
-          currentQty: Number(currentQty || 0),
-          reorderThreshold: Number(reorderThreshold || 0),
+          unit,
+          currentQty: parsedCurrentQty,
+          reorderThreshold: parsedThreshold,
           locationId,
           note: note.trim() ? note.trim() : undefined,
         }),
@@ -131,6 +142,34 @@ export function ConsumablesPage() {
     } catch (e: any) {
       setError(e?.message ?? "登録に失敗しました");
     }
+  }
+
+  async function addLocation() {
+    const value = newLocation.trim();
+    if (!value) return;
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch(apiUrl("/locations"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: value }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const created = (await res.json()) as Location;
+      const next = [...locations, created].sort((a, b) => a.name.localeCompare(b.name, "ja"));
+      setLocations(next);
+      setLocationId(created.id);
+      setNewLocation("");
+    } catch (e: any) {
+      setError(e?.message ?? "保管場所の追加に失敗しました");
+    }
+  }
+
+  function normalizeIntegerInput(value: string) {
+    return value
+      .replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xfee0))
+      .replace(/[^0-9]/g, "");
   }
 
   async function adjustQuantity(id: string, delta: number) {
@@ -185,20 +224,27 @@ export function ConsumablesPage() {
           </label>
           <label className="field">
             <span>単位</span>
-            <input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="個 / 本 / mL など" />
+            <select value={unit} onChange={(e) => setUnit(e.target.value as "個" | "本")}>
+              <option value="個">個</option>
+              <option value="本">本</option>
+            </select>
           </label>
           <label className="field">
             <span>現在数量</span>
-            <input type="number" min="0" step="0.01" value={currentQty} onChange={(e) => setCurrentQty(e.target.value)} />
+            <input
+              type="text"
+              inputMode="numeric"
+              value={currentQty}
+              onChange={(e) => setCurrentQty(normalizeIntegerInput(e.target.value))}
+            />
           </label>
           <label className="field">
             <span>発注目安（この値以下で要発注）</span>
             <input
-              type="number"
-              min="0"
-              step="0.01"
+              type="text"
+              inputMode="numeric"
               value={reorderThreshold}
-              onChange={(e) => setReorderThreshold(e.target.value)}
+              onChange={(e) => setReorderThreshold(normalizeIntegerInput(e.target.value))}
             />
           </label>
           <label className="field">
@@ -210,6 +256,15 @@ export function ConsumablesPage() {
                 </option>
               ))}
             </select>
+          </label>
+          <label className="field">
+            <span>保管場所新規登録</span>
+            <div className="form-row">
+              <input value={newLocation} onChange={(e) => setNewLocation(e.target.value)} placeholder="新しい保管場所名" />
+              <button className="btn btn-secondary" type="button" onClick={addLocation}>
+                追加
+              </button>
+            </div>
           </label>
           <label className="field">
             <span>メモ</span>
