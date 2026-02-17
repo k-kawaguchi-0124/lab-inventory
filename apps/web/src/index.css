@@ -434,6 +434,33 @@ textarea {
   background: #f3f8ff;
 }
 
+.qty-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.badge-ok,
+.badge-warn {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.badge-ok {
+  color: #0f5f35;
+  background: #e9f9ef;
+  border: 1px solid #b6e7c9;
+}
+
+.badge-warn {
+  color: #8a3b00;
+  background: #fff2e8;
+  border: 1px solid #ffd1ad;
+}
+
 .user-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

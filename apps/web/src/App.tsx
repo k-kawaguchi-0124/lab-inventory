@@ -9,6 +9,7 @@ import { AssetListPage } from "./pages/AssetListPage";
 import { AssetEditPage } from "./pages/AssetEditPage";
 import { UsersPage } from "./pages/UsersPage";
 import { AssetSearchPage } from "./pages/AssetSearchPage";
+import { ConsumablesPage } from "./pages/ConsumablesPage";
 
 export default function App() {
   return (
@@ -29,6 +30,9 @@ export default function App() {
               <NavLink to="/assets/new" className="topnav-link">
                 新規登録
               </NavLink>
+              <NavLink to="/consumables" className="topnav-link">
+                消耗品
+              </NavLink>
               <NavLink to="/users" className="topnav-link">
                 ユーザ
               </NavLink>
@@ -46,6 +50,7 @@ export default function App() {
             <Route path="/assets/checkout" element={<AssetCheckoutPage />} />
             <Route path="/assets/checkin" element={<AssetCheckinPage />} />
             <Route path="/assets/move" element={<AssetMovePage />} />
+            <Route path="/consumables" element={<ConsumablesPage />} />
             <Route path="/users" element={<UsersPage />} />
           </Routes>
         </main>

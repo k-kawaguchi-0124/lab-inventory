@@ -1,5 +1,5 @@
 import Fastify from "fastify";
-import { PrismaClient, TargetType, ActionType } from "@prisma/client";
+import { PrismaClient, TargetType, ActionType, Prisma } from "@prisma/client";
 import { z, ZodError } from "zod";
 
 const prisma = new PrismaClient();
@@ -157,6 +157,183 @@ app.get("/asset-budgets", async () => {
     take: 500,
   });
   return { items: rows.map((x) => x.budgetCode).filter((x): x is string => Boolean(x && x.trim())) };
+});
+
+app.get("/consumable-categories", async () => {
+  const rows = await prisma.consumable.findMany({
+    select: { category: true },
+    distinct: ["category"],
+    orderBy: { category: "asc" },
+    take: 500,
+  });
+  return { items: rows.map((x) => x.category) };
+});
+
+app.post("/consumables", async (req, reply) => {
+  const body = z
+    .object({
+      serial: z.string().min(3),
+      name: z.string().min(1),
+      category: z.string().min(1),
+      unit: z.string().min(1),
+      currentQty: z.coerce.number().min(0),
+      reorderThreshold: z.coerce.number().min(0),
+      locationId: z.string().min(1),
+      note: z.string().optional(),
+    })
+    .parse(req.body);
+
+  const reservation = await prisma.serialReservation.findUnique({
+    where: { serial: body.serial },
+  });
+
+  if (!reservation) {
+    return reply.status(400).send({ error: "Serial is not reserved." });
+  }
+  if (reservation.type !== TargetType.CONSUMABLE) {
+    return reply.status(400).send({ error: "Serial type mismatch." });
+  }
+  if (reservation.expiresAt.getTime() < Date.now()) {
+    return reply.status(400).send({ error: "Serial reservation expired." });
+  }
+
+  const actorId = await getSystemUserId();
+
+  const created = await prisma.$transaction(async (tx) => {
+    const consumable = await tx.consumable.create({
+      data: {
+        serial: body.serial,
+        name: body.name,
+        category: body.category,
+        unit: body.unit,
+        currentQty: new Prisma.Decimal(body.currentQty),
+        reorderThreshold: new Prisma.Decimal(body.reorderThreshold),
+        locationId: body.locationId,
+        ...(body.note ? { note: body.note } : {}),
+        lastActivityAt: new Date(),
+      },
+    });
+
+    await tx.activityLog.create({
+      data: {
+        actorId,
+        targetType: "CONSUMABLE",
+        targetId: consumable.id,
+        action: "CREATE",
+        note: "consumable created",
+      },
+    });
+
+    await tx.serialReservation.delete({ where: { serial: body.serial } });
+
+    return consumable;
+  });
+
+  return reply.status(201).send(created);
+});
+
+app.get("/consumables", async (req) => {
+  const q = z
+    .object({
+      query: z.string().optional(),
+      locationId: z.string().optional(),
+      needsReorder: z.coerce.boolean().optional(),
+      take: z.coerce.number().int().min(1).max(300).optional(),
+    })
+    .parse(req.query);
+
+  const take = q.take ?? 200;
+  const where: any = {};
+  if (q.locationId) where.locationId = q.locationId;
+  if (q.query && q.query.trim().length > 0) {
+    const term = q.query.trim();
+    where.OR = [
+      { serial: { contains: term, mode: "insensitive" } },
+      { name: { contains: term, mode: "insensitive" } },
+      { category: { contains: term, mode: "insensitive" } },
+    ];
+  }
+
+  const items = await prisma.consumable.findMany({
+    where,
+    orderBy: [{ updatedAt: "desc" }],
+    take,
+    include: {
+      location: { select: { id: true, name: true } },
+    },
+  });
+
+  const mapped = items.map((c) => ({
+    ...c,
+    needsReorder: new Prisma.Decimal(c.currentQty).lte(c.reorderThreshold),
+  }));
+
+  if (q.needsReorder === true) {
+    return mapped.filter((x) => x.needsReorder);
+  }
+  return mapped;
+});
+
+app.post("/consumables/:id/adjust", async (req, reply) => {
+  const params = z.object({ id: z.string().min(1) }).parse(req.params);
+  const body = z
+    .object({
+      delta: z.coerce.number(),
+      note: z.string().optional(),
+    })
+    .parse(req.body);
+
+  if (body.delta === 0) return reply.send({ ok: true });
+
+  const actorId = await getSystemUserId();
+
+  const result = await prisma.$transaction(async (tx) => {
+    const current = await tx.consumable.findUnique({
+      where: { id: params.id },
+      select: { id: true, currentQty: true, locationId: true },
+    });
+    if (!current) {
+      reply.status(404);
+      return { error: "Consumable not found." };
+    }
+
+    const next = new Prisma.Decimal(current.currentQty).plus(body.delta);
+    if (next.lt(0)) {
+      reply.status(400);
+      return { error: "Quantity cannot be negative." };
+    }
+
+    const updated = await tx.consumable.update({
+      where: { id: params.id },
+      data: {
+        currentQty: next,
+        lastActivityAt: new Date(),
+      },
+      include: {
+        location: { select: { id: true, name: true } },
+      },
+    });
+
+    await tx.activityLog.create({
+      data: {
+        actorId,
+        targetType: "CONSUMABLE",
+        targetId: updated.id,
+        action: "QTY_CHANGE",
+        qtyDelta: new Prisma.Decimal(body.delta),
+        toLocationId: current.locationId,
+        note: body.note,
+      },
+    });
+
+    return {
+      ...updated,
+      needsReorder: new Prisma.Decimal(updated.currentQty).lte(updated.reorderThreshold),
+    };
+  });
+
+  if ("error" in result) return reply.send(result);
+  return reply.send(result);
 });
 
 app.get("/locations", async () => {

@@ -97,6 +97,9 @@ export function HomePage() {
           <Link to="/assets/checkin" className="action-link">
             返却
           </Link>
+          <Link to="/consumables" className="action-link">
+            消耗品管理
+          </Link>
         </div>
       </div>
 
