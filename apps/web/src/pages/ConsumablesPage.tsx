@@ -294,7 +294,7 @@ export function ConsumablesPage() {
         {message && <p className="msg-ok">{message}</p>}
         {error && <p className="msg-err">{error}</p>}
 
-        <div className="table-wrap">
+        <div className="table-wrap consumables-desktop-table">
           <table className="data-table table-wide-user consumables-table">
             <thead>
               <tr>
@@ -365,6 +365,63 @@ export function ConsumablesPage() {
               )}
             </tbody>
           </table>
+        </div>
+
+        <div className="consumables-mobile-list" aria-live="polite">
+          {loading ? (
+            <p>読み込み中...</p>
+          ) : items.length === 0 ? (
+            <p>データがありません</p>
+          ) : (
+            items.map((c) => {
+              const qty = num(c.currentQty);
+              const threshold = num(c.reorderThreshold);
+              const shortage = Math.max(0, threshold - qty);
+              return (
+                <article key={c.id} className="consumable-mobile-item">
+                  <div className="consumable-mobile-main">
+                    <div>
+                      <p className="consumable-mobile-name">{c.name}</p>
+                      <p className="consumable-mobile-meta">
+                        {c.category} / {c.location?.name ?? c.locationId}
+                      </p>
+                      <p className="consumable-mobile-meta mono">{c.serial}</p>
+                    </div>
+                    <div className="consumable-mobile-status">
+                      {c.needsReorder ? <span className="badge-warn">要発注</span> : <span className="badge-ok">在庫あり</span>}
+                    </div>
+                  </div>
+
+                  <div className="consumable-mobile-qty">
+                    <span>
+                      現在: <strong>{qty}</strong> {c.unit}
+                    </span>
+                    <span>
+                      目安: {threshold} {c.unit}
+                    </span>
+                    <span>
+                      不足: {shortage} {c.unit}
+                    </span>
+                  </div>
+
+                  <div className="qty-actions consumable-mobile-actions">
+                    <button className="btn btn-secondary" onClick={() => adjustQuantity(c.id, -1)}>
+                      -1
+                    </button>
+                    <button className="btn btn-secondary" onClick={() => adjustQuantity(c.id, -5)}>
+                      -5
+                    </button>
+                    <button className="btn btn-secondary" onClick={() => adjustQuantity(c.id, 1)}>
+                      +1
+                    </button>
+                    <button className="btn btn-secondary" onClick={() => adjustQuantity(c.id, 5)}>
+                      +5
+                    </button>
+                  </div>
+                </article>
+              );
+            })
+          )}
         </div>
       </div>
     </section>
