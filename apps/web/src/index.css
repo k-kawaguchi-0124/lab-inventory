@@ -757,6 +757,11 @@ select option {
   white-space: nowrap;
 }
 
+.masters-table th,
+.masters-table td {
+  vertical-align: middle;
+}
+
 @media (max-width: 900px) {
   .stat-grid,
   .action-grid,
