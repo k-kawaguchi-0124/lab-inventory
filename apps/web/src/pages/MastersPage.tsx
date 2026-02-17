@@ -161,7 +161,7 @@ export function MastersPage() {
               key: x.id,
               id: x.id,
               name: x.name,
-              usageLabel: `備品${x.assetCount}/消耗品${x.consumableCount}/子${x.childCount}`,
+              usageLabel: `備品${x.assetCount}/消耗品${x.consumableCount}`,
               canDelete: x.assetCount === 0 && x.consumableCount === 0 && x.childCount === 0,
             })) ?? [];
 
