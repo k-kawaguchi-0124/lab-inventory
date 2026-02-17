@@ -112,6 +112,32 @@ app.get("/users/:id/assets", async (req, reply) => {
   };
 });
 
+app.delete("/users/:id", async (req, reply) => {
+  const params = z.object({ id: z.string().min(1) }).parse(req.params);
+
+  const user = await prisma.user.findUnique({
+    where: { id: params.id },
+    select: { id: true, name: true, email: true },
+  });
+  if (!user) return reply.status(404).send({ error: "User not found." });
+  if (user.email === "system@local") {
+    return reply.status(400).send({ error: "SYSTEM user cannot be deleted." });
+  }
+
+  const holdingCount = await prisma.asset.count({
+    where: { currentUserId: params.id, status: "CHECKED_OUT" },
+  });
+  if (holdingCount > 0) {
+    return reply.status(400).send({ error: "User has checked-out assets. Check in assets first." });
+  }
+
+  await prisma.user.delete({
+    where: { id: params.id },
+  });
+
+  return reply.send({ ok: true });
+});
+
 app.get("/asset-categories", async () => {
   const rows = await prisma.asset.findMany({
     select: { category: true },

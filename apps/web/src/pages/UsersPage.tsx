@@ -104,6 +104,28 @@ export function UsersPage() {
     }
   }
 
+  async function onDeleteUser(user: User) {
+    const ok = window.confirm(`ユーザ「${user.name}」を削除しますか？`);
+    if (!ok) return;
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch(apiUrl(`/users/${user.id}`), { method: "DELETE" });
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson?.error ?? `HTTP ${res.status}`);
+      }
+      setMessage(`ユーザを削除しました: ${user.name}`);
+      if (selectedUserId === user.id) {
+        setSelectedUserId("");
+        setBorrowed(null);
+      }
+      await loadUsers();
+    } catch (e: any) {
+      setError(e?.message ?? "ユーザ削除に失敗しました");
+    }
+  }
+
   return (
     <section className="panel">
       <h1 className="panel-title">ユーザ管理</h1>
@@ -143,12 +165,13 @@ export function UsersPage() {
                 <tr>
                   <th>Name</th>
                   <th>Role</th>
+                  <th>操作</th>
                 </tr>
               </thead>
               <tbody>
                 {users.length === 0 ? (
                   <tr>
-                    <td colSpan={2}>ユーザがありません</td>
+                    <td colSpan={3}>ユーザがありません</td>
                   </tr>
                 ) : (
                   users.map((u) => (
@@ -164,6 +187,16 @@ export function UsersPage() {
                         </button>
                       </td>
                       <td>{u.role}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          style={{ padding: "6px 10px" }}
+                          onClick={() => onDeleteUser(u)}
+                        >
+                          削除
+                        </button>
+                      </td>
                     </tr>
                   ))
                 )}
