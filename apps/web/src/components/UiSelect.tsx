@@ -57,7 +57,13 @@ export function UiSelect({ value, options, onChange, placeholder = "選択して
               key={o.value}
               type="button"
               className={`ui-select-option ${o.value === value ? "is-selected" : ""}`}
-              onClick={() => {
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
                 if (o.disabled) return;
                 onChange(o.value);
                 setOpen(false);
