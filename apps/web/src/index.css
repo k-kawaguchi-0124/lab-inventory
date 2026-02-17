@@ -68,6 +68,7 @@ a {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  position: relative;
 }
 
 .brand {
@@ -78,6 +79,29 @@ a {
 .topnav {
   display: flex;
   gap: 8px;
+}
+
+.hamburger-btn {
+  display: none;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  padding: 8px;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.hamburger-btn span {
+  display: block;
+  width: 18px;
+  height: 2px;
+  border-radius: 999px;
+  background: #274069;
 }
 
 .topnav-link {
@@ -497,6 +521,41 @@ textarea {
 }
 
 @media (max-width: 640px) {
+  .topbar-inner {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .hamburger-btn {
+    display: inline-flex;
+  }
+
+  .topnav {
+    display: none;
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 12px;
+    right: 12px;
+    flex-direction: column;
+    gap: 4px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    box-shadow: 0 10px 24px rgba(23, 32, 51, 0.14);
+    padding: 8px;
+    z-index: 30;
+  }
+
+  .topnav.open {
+    display: flex;
+  }
+
+  .topnav-link {
+    border-radius: 10px;
+    padding: 10px 12px;
+  }
+
   .page-container {
     padding: 14px 12px 28px;
   }
