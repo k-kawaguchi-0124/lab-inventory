@@ -356,7 +356,7 @@ textarea {
 
 .field-inline input,
 .field-inline select {
-  min-width: 90px;
+  min-width: 20px;
 }
 
 .serial-badge {
