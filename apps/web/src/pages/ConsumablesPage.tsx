@@ -295,7 +295,7 @@ export function ConsumablesPage() {
         {error && <p className="msg-err">{error}</p>}
 
         <div className="table-wrap">
-          <table className="data-table table-wide-user">
+          <table className="data-table table-wide-user consumables-table">
             <thead>
               <tr>
                 <th>Serial</th>
@@ -326,24 +326,24 @@ export function ConsumablesPage() {
                   const shortage = Math.max(0, threshold - qty);
                   return (
                     <tr key={c.id}>
-                      <td className="mono">{c.serial}</td>
-                      <td>{c.name}</td>
-                      <td>{c.category}</td>
-                      <td>
+                      <td className="mono" data-label="Serial">{c.serial}</td>
+                      <td data-label="Name">{c.name}</td>
+                      <td data-label="Category">{c.category}</td>
+                      <td data-label="数量">
                         {qty} {c.unit}
                       </td>
-                      <td>
+                      <td data-label="発注目安">
                         {threshold} {c.unit}
                       </td>
-                      <td>
+                      <td data-label="状態">
                         {c.needsReorder ? <span className="badge-warn">要発注</span> : <span className="badge-ok">在庫あり</span>}
                       </td>
-                      <td>
+                      <td data-label="不足量">
                         {shortage} {c.unit}
                       </td>
-                      <td>{c.location?.name ?? c.locationId}</td>
-                      <td>{new Date(c.lastActivityAt).toLocaleString("ja-JP")}</td>
-                      <td>
+                      <td data-label="場所">{c.location?.name ?? c.locationId}</td>
+                      <td data-label="更新">{new Date(c.lastActivityAt).toLocaleString("ja-JP")}</td>
+                      <td data-label="数量操作">
                         <div className="qty-actions">
                           <button className="btn btn-secondary" onClick={() => adjustQuantity(c.id, -1)}>
                             -1

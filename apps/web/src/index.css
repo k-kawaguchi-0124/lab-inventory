@@ -544,4 +544,80 @@ textarea {
   .table-wide-user {
     min-width: 900px;
   }
+
+  .users-table,
+  .borrowed-table,
+  .consumables-table {
+    min-width: 100%;
+  }
+
+  .users-table thead,
+  .borrowed-table thead,
+  .consumables-table thead {
+    display: none;
+  }
+
+  .users-table tbody,
+  .borrowed-table tbody,
+  .consumables-table tbody {
+    display: grid;
+    gap: 10px;
+  }
+
+  .users-table tr,
+  .borrowed-table tr,
+  .consumables-table tr {
+    display: block;
+    border: 1px solid #e3ebf7;
+    border-radius: 12px;
+    padding: 10px;
+    background: #fff;
+  }
+
+  .users-table td,
+  .borrowed-table td,
+  .consumables-table td {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px dashed #edf2fb;
+  }
+
+  .users-table td:last-child,
+  .borrowed-table td:last-child,
+  .consumables-table td:last-child {
+    border-bottom: 0;
+  }
+
+  .users-table td::before,
+  .borrowed-table td::before,
+  .consumables-table td::before {
+    content: attr(data-label);
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 700;
+    flex: 0 0 42%;
+  }
+
+  .users-table td > *:only-child,
+  .borrowed-table td > *:only-child,
+  .consumables-table td > *:only-child {
+    margin-left: auto;
+    text-align: right;
+  }
+
+  .users-table td[colspan],
+  .borrowed-table td[colspan],
+  .consumables-table td[colspan] {
+    display: block;
+    text-align: left;
+    border-bottom: 0;
+  }
+
+  .users-table td[colspan]::before,
+  .borrowed-table td[colspan]::before,
+  .consumables-table td[colspan]::before {
+    content: none;
+  }
 }

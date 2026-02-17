@@ -160,7 +160,7 @@ export function UsersPage() {
           </div>
           {loadingUsers && <p>ユーザ一覧を取得中...</p>}
           <div className="table-wrap">
-            <table className="data-table">
+            <table className="data-table users-table">
               <thead>
                 <tr>
                   <th>Name</th>
@@ -176,7 +176,7 @@ export function UsersPage() {
                 ) : (
                   users.map((u) => (
                     <tr key={u.id}>
-                      <td>
+                      <td data-label="Name">
                         <button
                           type="button"
                           className="btn btn-secondary"
@@ -186,8 +186,8 @@ export function UsersPage() {
                           {u.name}
                         </button>
                       </td>
-                      <td>{u.role}</td>
-                      <td>
+                      <td data-label="Role">{u.role}</td>
+                      <td data-label="操作">
                         <button
                           type="button"
                           className="btn btn-secondary"
@@ -215,7 +215,7 @@ export function UsersPage() {
                 {borrowed.user.name} / 貸出中 {borrowed.count}件
               </p>
               <div className="table-wrap">
-                <table className="data-table table-wide-user">
+                <table className="data-table table-wide-user borrowed-table">
                   <thead>
                     <tr>
                       <th>Serial</th>
@@ -234,12 +234,12 @@ export function UsersPage() {
                     ) : (
                       borrowed.assets.map((a) => (
                         <tr key={a.id}>
-                          <td className="mono">{a.serial}</td>
-                          <td>{a.name}</td>
-                          <td>{a.category}</td>
-                          <td>{a.currentLocation?.name ?? "-"}</td>
-                          <td>{a.status}</td>
-                          <td>{new Date(a.lastActivityAt).toLocaleString("ja-JP")}</td>
+                          <td className="mono" data-label="Serial">{a.serial}</td>
+                          <td data-label="Name">{a.name}</td>
+                          <td data-label="Category">{a.category}</td>
+                          <td data-label="Location">{a.currentLocation?.name ?? "-"}</td>
+                          <td data-label="Status">{a.status}</td>
+                          <td data-label="Last Activity">{new Date(a.lastActivityAt).toLocaleString("ja-JP")}</td>
                         </tr>
                       ))
                     )}
