@@ -355,11 +355,25 @@ textarea {
   gap: 12px;
 }
 
+.compact-form .field {
+  gap: 4px;
+}
+
 .field {
   display: grid;
   gap: 6px;
   font-size: 14px;
   color: var(--muted);
+}
+
+.field-compact input,
+.field-compact select,
+.field-compact textarea {
+  padding: 8px 10px;
+}
+
+.field-compact .form-row {
+  gap: 6px;
 }
 
 .field-full {

@@ -62,7 +62,7 @@ export function AssetCheckoutPage() {
         setLocations(l);
         setUsers(u);
         if (l.length > 0) setLocationId(l[0].id);
-        if (u.length > 0) setUserId(u[0].id);
+        setUserId("");
       })
       .catch(() => {
         setLocations([]);
@@ -161,6 +161,7 @@ export function AssetCheckoutPage() {
         <label className="field">
           <span>貸出先ユーザー</span>
           <select value={userId} onChange={(e) => setUserId(e.target.value)} required>
+            <option value="">選択してください</option>
             {users.map((u) => (
               <option key={u.id} value={u.id}>
                 {u.name}

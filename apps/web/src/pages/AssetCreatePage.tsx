@@ -153,7 +153,7 @@ export function AssetCreatePage() {
         <div className="serial-badge">{serial || "未予約"}</div>
       </div>
 
-      <form className="form-grid" onSubmit={onSubmit}>
+      <form className="form-grid compact-form" onSubmit={onSubmit}>
         <label className="field">
           <span>名称</span>
           <input value={name} onChange={(e) => setName(e.target.value)} required />
@@ -182,7 +182,7 @@ export function AssetCreatePage() {
             </button>
           </div>
         </label>
-        <label className="field">
+        <label className="field field-compact">
           <span>予算</span>
           <select value={budgetCode} onChange={(e) => setBudgetCode(e.target.value)}>
             <option value="">選択してください</option>
@@ -193,7 +193,7 @@ export function AssetCreatePage() {
             ))}
           </select>
         </label>
-        <label className="field">
+        <label className="field field-compact">
           <span>予算新規登録</span>
           <div className="form-row">
             <input
@@ -206,7 +206,7 @@ export function AssetCreatePage() {
             </button>
           </div>
         </label>
-        <label className="field">
+        <label className="field field-compact">
           <span>購入日</span>
           <input type="date" value={purchasedAt} onChange={(e) => setPurchasedAt(e.target.value)} />
         </label>
