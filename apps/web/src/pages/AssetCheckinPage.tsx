@@ -4,15 +4,32 @@ import { useSearchParams } from "react-router-dom";
 import { apiUrl } from "../lib/api";
 
 type Location = { id: string; name: string };
+type User = { id: string; name: string; role: "ADMIN" | "MEMBER" };
+type BorrowedAsset = {
+  id: string;
+  serial: string;
+  name: string;
+  category: string;
+  currentLocation?: { id: string; name: string } | null;
+};
+type BorrowedResponse = {
+  user: User;
+  count: number;
+  assets: BorrowedAsset[];
+};
 
 export function AssetCheckinPage() {
   const [searchParams] = useSearchParams();
+  const [users, setUsers] = useState<User[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState("");
+  const [borrowedAssets, setBorrowedAssets] = useState<BorrowedAsset[]>([]);
   const [assetId, setAssetId] = useState("");
   const [locationId, setLocationId] = useState("");
   const [newLocation, setNewLocation] = useState("");
   const [note, setNote] = useState("");
   const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingAssets, setLoadingAssets] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,22 +55,54 @@ export function AssetCheckinPage() {
   }
 
   useEffect(() => {
-    const prefilled = searchParams.get("assetId");
-    if (prefilled) setAssetId(prefilled);
-  }, [searchParams]);
+    Promise.all([fetch(apiUrl("/locations")), fetch(apiUrl("/users"))])
+      .then(async ([lRes, uRes]) => {
+        const locItems = (await lRes.json()) as Location[];
+        const userItems = (await uRes.json()) as User[];
+        setLocations(locItems);
+        setUsers(userItems);
+        if (locItems.length > 0) setLocationId(locItems[0].id);
+
+        const prefilledAssetId = searchParams.get("assetId");
+        if (prefilledAssetId) {
+          setAssetId(prefilledAssetId);
+        }
+      })
+      .catch(() => {
+        setLocations([]);
+        setUsers([]);
+      });
+  }, []);
 
   useEffect(() => {
-    fetch(apiUrl("/locations"))
-      .then((r) => r.json())
-      .then((items: Location[]) => {
-        setLocations(items);
-        if (items.length > 0) setLocationId(items[0].id);
+    if (!selectedUserId) {
+      setBorrowedAssets([]);
+      setAssetId("");
+      return;
+    }
+
+    setLoadingAssets(true);
+    fetch(apiUrl(`/users/${selectedUserId}/assets`))
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = (await res.json()) as BorrowedResponse;
+        setBorrowedAssets(json.assets);
+        if (json.assets.length > 0) setAssetId(json.assets[0].id);
+        else setAssetId("");
       })
-      .catch(() => setLocations([]));
-  }, []);
+      .catch(() => {
+        setBorrowedAssets([]);
+        setAssetId("");
+      })
+      .finally(() => setLoadingAssets(false));
+  }, [selectedUserId]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
+    if (!assetId) {
+      setError("返却する備品を選択してください");
+      return;
+    }
     setLoading(true);
     setError(null);
     setMessage(null);
@@ -80,12 +129,37 @@ export function AssetCheckinPage() {
   return (
     <section className="panel">
       <h1 className="panel-title">備品の返却</h1>
-      <p className="panel-subtitle">返却先の場所を指定して、備品を利用可能状態に戻します。</p>
+      <p className="panel-subtitle">ユーザを選び、そのユーザが借りている備品を選択して返却します。</p>
 
       <form className="form-grid" onSubmit={onSubmit}>
-        <label className="field field-full">
-          <span>備品ID</span>
-          <input value={assetId} onChange={(e) => setAssetId(e.target.value)} required placeholder="cuid..." />
+        <label className="field">
+          <span>ユーザ</span>
+          <select value={selectedUserId} onChange={(e) => setSelectedUserId(e.target.value)} required>
+            <option value="">選択してください</option>
+            {users.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          <span>返却する備品</span>
+          <select value={assetId} onChange={(e) => setAssetId(e.target.value)} required disabled={!selectedUserId || loadingAssets}>
+            {!selectedUserId ? (
+              <option value="">先にユーザを選択してください</option>
+            ) : loadingAssets ? (
+              <option value="">読み込み中...</option>
+            ) : borrowedAssets.length === 0 ? (
+              <option value="">貸出中の備品はありません</option>
+            ) : (
+              borrowedAssets.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.serial} / {a.name}
+                </option>
+              ))
+            )}
+          </select>
         </label>
         <label className="field">
           <span>返却先</span>
