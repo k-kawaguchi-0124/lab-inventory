@@ -748,6 +748,15 @@ select option {
   gap: 8px;
 }
 
+.masters-table {
+  table-layout: fixed;
+}
+
+.masters-table th:nth-child(3),
+.masters-table td:nth-child(3) {
+  white-space: nowrap;
+}
+
 @media (max-width: 900px) {
   .stat-grid,
   .action-grid,

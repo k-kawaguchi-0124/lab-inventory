@@ -199,7 +199,12 @@ export function MastersPage() {
       {error && <p className="msg-err">{error}</p>}
 
       <div className="table-wrap" style={{ marginTop: 10 }}>
-        <table className="data-table">
+        <table className="data-table masters-table">
+          <colgroup>
+            <col style={{ width: "40%" }} />
+            <col style={{ width: "25%" }} />
+            <col style={{ width: "35%" }} />
+          </colgroup>
           <thead>
             <tr>
               <th>名称</th>
