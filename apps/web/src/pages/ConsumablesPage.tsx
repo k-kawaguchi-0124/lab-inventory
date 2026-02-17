@@ -194,91 +194,6 @@ export function ConsumablesPage() {
   return (
     <section className="home">
       <div className="panel">
-        <h1 className="panel-title">消耗品管理</h1>
-        <p className="panel-subtitle">現在数量を直接更新します。0になってもデータは残り、次回入荷時に加算できます。</p>
-
-        <div className="form-grid">
-          <label className="field">
-            <span>名称</span>
-            <input value={name} onChange={(e) => setName(e.target.value)} />
-          </label>
-          <label className="field">
-            <span>カテゴリ</span>
-            <select value={category} onChange={(e) => setCategory(e.target.value)}>
-              <option value="">選択してください</option>
-              {categories.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span>カテゴリ新規登録</span>
-            <div className="form-row">
-              <input value={newCategory} onChange={(e) => setNewCategory(e.target.value)} placeholder="新しいカテゴリ名" />
-              <button className="btn btn-secondary" type="button" onClick={addCategory}>
-                追加
-              </button>
-            </div>
-          </label>
-          <label className="field">
-            <span>単位</span>
-            <select value={unit} onChange={(e) => setUnit(e.target.value as "個" | "本")}>
-              <option value="個">個</option>
-              <option value="本">本</option>
-            </select>
-          </label>
-          <label className="field">
-            <span>現在数量</span>
-            <input
-              type="text"
-              inputMode="numeric"
-              value={currentQty}
-              onChange={(e) => setCurrentQty(normalizeIntegerInput(e.target.value))}
-            />
-          </label>
-          <label className="field">
-            <span>発注目安（この値以下で要発注）</span>
-            <input
-              type="text"
-              inputMode="numeric"
-              value={reorderThreshold}
-              onChange={(e) => setReorderThreshold(normalizeIntegerInput(e.target.value))}
-            />
-          </label>
-          <label className="field">
-            <span>保管場所</span>
-            <select value={locationId} onChange={(e) => setLocationId(e.target.value)}>
-              {locations.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span>保管場所新規登録</span>
-            <div className="form-row">
-              <input value={newLocation} onChange={(e) => setNewLocation(e.target.value)} placeholder="新しい保管場所名" />
-              <button className="btn btn-secondary" type="button" onClick={addLocation}>
-                追加
-              </button>
-            </div>
-          </label>
-          <label className="field">
-            <span>メモ</span>
-            <input value={note} onChange={(e) => setNote(e.target.value)} />
-          </label>
-          <div className="field field-full">
-            <button className="btn btn-primary" type="button" onClick={createConsumable}>
-              消耗品を登録
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="panel">
         <h2 className="panel-title">在庫一覧</h2>
         <div className="search-row">
           <input className="input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="名前・カテゴリ検索" />
@@ -422,6 +337,91 @@ export function ConsumablesPage() {
               );
             })
           )}
+        </div>
+      </div>
+
+      <div className="panel">
+        <h1 className="panel-title">消耗品管理</h1>
+        <p className="panel-subtitle">現在数量を直接更新します。0になってもデータは残り、次回入荷時に加算できます。</p>
+
+        <div className="form-grid">
+          <label className="field">
+            <span>名称</span>
+            <input value={name} onChange={(e) => setName(e.target.value)} />
+          </label>
+          <label className="field">
+            <span>カテゴリ</span>
+            <select value={category} onChange={(e) => setCategory(e.target.value)}>
+              <option value="">選択してください</option>
+              {categories.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>カテゴリ新規登録</span>
+            <div className="form-row">
+              <input value={newCategory} onChange={(e) => setNewCategory(e.target.value)} placeholder="新しいカテゴリ名" />
+              <button className="btn btn-secondary" type="button" onClick={addCategory}>
+                追加
+              </button>
+            </div>
+          </label>
+          <label className="field">
+            <span>単位</span>
+            <select value={unit} onChange={(e) => setUnit(e.target.value as "個" | "本")}>
+              <option value="個">個</option>
+              <option value="本">本</option>
+            </select>
+          </label>
+          <label className="field">
+            <span>現在数量</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={currentQty}
+              onChange={(e) => setCurrentQty(normalizeIntegerInput(e.target.value))}
+            />
+          </label>
+          <label className="field">
+            <span>発注目安（この値以下で要発注）</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={reorderThreshold}
+              onChange={(e) => setReorderThreshold(normalizeIntegerInput(e.target.value))}
+            />
+          </label>
+          <label className="field">
+            <span>保管場所</span>
+            <select value={locationId} onChange={(e) => setLocationId(e.target.value)}>
+              {locations.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>保管場所新規登録</span>
+            <div className="form-row">
+              <input value={newLocation} onChange={(e) => setNewLocation(e.target.value)} placeholder="新しい保管場所名" />
+              <button className="btn btn-secondary" type="button" onClick={addLocation}>
+                追加
+              </button>
+            </div>
+          </label>
+          <label className="field">
+            <span>メモ</span>
+            <input value={note} onChange={(e) => setNote(e.target.value)} />
+          </label>
+          <div className="field field-full">
+            <button className="btn btn-primary" type="button" onClick={createConsumable}>
+              消耗品を登録
+            </button>
+          </div>
         </div>
       </div>
     </section>
