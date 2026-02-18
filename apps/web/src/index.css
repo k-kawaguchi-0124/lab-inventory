@@ -216,9 +216,9 @@ a {
   color: var(--muted);
 }
 
-/* .form-row {
+.form-row {
   margin-bottom: 20px;
-} */
+}
 
 .search-row {
   margin-bottom: 20px;
@@ -448,6 +448,10 @@ select option {
 
 .field-compact .form-row {
   gap: 6px;
+}
+
+.field .form-row {
+  margin-bottom: 0;
 }
 
 .field-full {
