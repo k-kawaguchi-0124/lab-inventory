@@ -325,6 +325,7 @@ export function ConsumablesPage() {
                       <td data-label="更新">{new Date(c.lastActivityAt).toLocaleString("ja-JP")}</td>
                       <td data-label="直接入力">
                         <input
+                          className="direct-qty-input"
                           type="text"
                           inputMode="numeric"
                           value={qtyInputs[c.id] ?? String(c.currentQty)}
@@ -393,11 +394,12 @@ export function ConsumablesPage() {
                     <span>
                       直接入力:
                       <input
+                        className="direct-qty-input"
                         type="text"
                         inputMode="numeric"
                         value={qtyInputs[c.id] ?? String(c.currentQty)}
                         onChange={(e) => onChangeDirectQty(c.id, e.target.value, c.currentQty)}
-                        style={{ width: 84, marginLeft: 8 }}
+                        style={{ marginLeft: 8 }}
                       />
                     </span>
                   </div>

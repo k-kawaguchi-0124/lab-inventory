@@ -730,6 +730,10 @@ select option {
   min-width: 0;
 }
 
+.direct-qty-input {
+  width: 92px;
+}
+
 .timeline-panel {
   margin-top: 18px;
   padding-top: 12px;
@@ -907,6 +911,10 @@ select option {
   .qty-actions .btn {
     width: 100%;
     padding: 8px 10px;
+  }
+
+  .direct-qty-input {
+    width: 84px;
   }
 
   .table-wide-user {
