@@ -74,14 +74,12 @@ export function ConsumablesPage() {
       if (!res.ok) throw new Error(await apiErrorMessage(res, "在庫一覧の取得に失敗しました"));
       const json = (await res.json()) as Consumable[];
       setItems(json);
-      setQtyInputs((prev) => {
-        const next: Record<string, string> = {};
-        for (const item of json) {
-          next[item.id] = prev[item.id] ?? String(item.currentQty);
-        }
-        return next;
-      });
-      setPendingIds((prev) => prev.filter((id) => json.some((x) => x.id === id)));
+      const nextInputs: Record<string, string> = {};
+      for (const item of json) {
+        nextInputs[item.id] = String(item.currentQty);
+      }
+      setQtyInputs(nextInputs);
+      setPendingIds([]);
     } catch (e: any) {
       setError(unknownErrorMessage(e, "在庫一覧の取得に失敗しました"));
       setItems([]);
@@ -200,7 +198,10 @@ export function ConsumablesPage() {
       if (!res.ok) {
         throw new Error(await apiErrorMessage(res, "数量更新に失敗しました"));
       }
-      await loadItems();
+      const updated = (await res.json()) as Consumable;
+      setItems((prev) => prev.map((x) => (x.id === id ? { ...x, ...updated } : x)));
+      setQtyInputs((prev) => ({ ...prev, [id]: String(updated.currentQty) }));
+      setPendingIds((prev) => prev.filter((x) => x !== id));
     } catch (e: unknown) {
       setError(unknownErrorMessage(e, "数量更新に失敗しました"));
     }
