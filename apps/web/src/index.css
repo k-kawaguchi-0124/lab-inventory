@@ -1027,4 +1027,13 @@ select option {
   .stale-table td[colspan]::before {
     content: none;
   }
+
+  /* 物品一覧はモバイルで主要項目のみに絞って縦長を抑える */
+  .assets-list-table td:nth-child(3),
+  .assets-list-table td:nth-child(4),
+  .assets-list-table td:nth-child(5),
+  .assets-list-table td:nth-child(7),
+  .assets-list-table td:nth-child(9) {
+    display: none;
+  }
 }
