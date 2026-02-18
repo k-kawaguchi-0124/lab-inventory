@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { apiUrl } from "../lib/api";
 import { UiSelect } from "../components/UiSelect";
+import { apiErrorMessage, unknownErrorMessage } from "../lib/errors";
 
 type Location = {
   id: string;
@@ -48,6 +49,11 @@ export function AssetCreatePage() {
       });
   }, []);
 
+  useEffect(() => {
+    if (serial || loading) return;
+    reserveSerial(true).catch(() => undefined);
+  }, []);
+
   function addCategory() {
     const value = newCategory.trim();
     if (!value) return;
@@ -92,18 +98,20 @@ export function AssetCreatePage() {
     }
   }
 
-  async function reserveSerial() {
+  async function reserveSerial(silent = false) {
     setLoading(true);
     setError(null);
-    setMessage(null);
+    if (!silent) setMessage(null);
     try {
       const res = await fetch(apiUrl("/serials/reserve?type=ASSET"), { method: "POST" });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw new Error(await apiErrorMessage(res, "シリアル予約に失敗しました"));
       const json = (await res.json()) as { serial: string; expiresAt: string };
       setSerial(json.serial);
-      setMessage(`シリアルを予約しました（期限: ${new Date(json.expiresAt).toLocaleTimeString("ja-JP")}）`);
-    } catch (e: any) {
-      setError(e?.message ?? "予約に失敗しました");
+      if (!silent) {
+        setMessage(`シリアルを予約しました（期限: ${new Date(json.expiresAt).toLocaleTimeString("ja-JP")}）`);
+      }
+    } catch (e: unknown) {
+      setError(unknownErrorMessage(e, "シリアル予約に失敗しました"));
     } finally {
       setLoading(false);
     }
@@ -112,7 +120,7 @@ export function AssetCreatePage() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (!serial) {
-      setError("先にシリアル予約を実行してください");
+      setError("シリアル予約が取得できていません。シリアル予約を実行してください");
       return;
     }
     setLoading(true);
@@ -132,7 +140,7 @@ export function AssetCreatePage() {
           note: note.trim() ? note : undefined,
         }),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw new Error(await apiErrorMessage(res, "備品の登録に失敗しました"));
       const json = (await res.json()) as { id: string; serial: string };
       setMessage(`備品を登録しました: ${json.serial}`);
       setSerial("");
@@ -141,8 +149,9 @@ export function AssetCreatePage() {
       setBudgetCode("");
       setPurchasedAt("");
       setNote("");
-    } catch (err: any) {
-      setError(err?.message ?? "登録に失敗しました");
+      await reserveSerial(true);
+    } catch (err: unknown) {
+      setError(unknownErrorMessage(err, "備品の登録に失敗しました"));
     } finally {
       setLoading(false);
     }
@@ -151,10 +160,10 @@ export function AssetCreatePage() {
   return (
     <section className="panel">
       <h1 className="panel-title">備品の新規登録</h1>
-      <p className="panel-subtitle">シリアル予約後に備品情報を登録します。</p>
+      <p className="panel-subtitle">ページ表示時にシリアルを自動予約します。必要に応じて再予約できます。</p>
 
       <div className="form-row">
-        <button type="button" className="btn btn-secondary" onClick={reserveSerial} disabled={loading}>
+        <button type="button" className="btn btn-secondary" onClick={() => reserveSerial()} disabled={loading}>
           シリアル予約
         </button>
         <div className="serial-badge">{serial || "未予約"}</div>
