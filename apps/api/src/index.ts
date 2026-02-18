@@ -702,54 +702,65 @@ app.post("/serials/reserve", async (req, reply) => {
 
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
-  const result = await prisma.$transaction(async (tx) => {
-    // counter を行ロック的に更新
-    const counter = await tx.serialCounter.upsert({
-      where: { prefix },
-      create: { prefix, nextValue: 1 },
-      update: {},
-    });
+  // 同時実行競合で一時的にユニーク制約に触れる場合があるため、数回リトライする。
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      const result = await prisma.$transaction(async (tx) => {
+        // counter を行ロック的に更新
+        const counter = await tx.serialCounter.upsert({
+          where: { prefix },
+          create: { prefix, nextValue: 1 },
+          update: {},
+        });
 
-    let seq = counter.nextValue;
-    let serial = formatSerial(year2, seq);
+        let seq = counter.nextValue;
+        let serial = formatSerial(year2, seq);
 
-    // 既存データ（予約/備品/消耗品）と衝突しないシリアルを探す
-    // 既存環境で採番方式が変わった後でも重複による500を防ぐ
-    while (true) {
-      const [reserved, asset, consumable] = await Promise.all([
-        tx.serialReservation.findUnique({ where: { serial }, select: { serial: true } }),
-        tx.asset.findUnique({ where: { serial }, select: { id: true } }),
-        tx.consumable.findUnique({ where: { serial }, select: { id: true } }),
-      ]);
+        // 既存データ（予約/備品/消耗品）と衝突しないシリアルを探す
+        // 既存環境で採番方式が変わった後でも重複による500を防ぐ
+        while (true) {
+          const [reserved, asset, consumable] = await Promise.all([
+            tx.serialReservation.findUnique({ where: { serial }, select: { serial: true } }),
+            tx.asset.findUnique({ where: { serial }, select: { id: true } }),
+            tx.consumable.findUnique({ where: { serial }, select: { id: true } }),
+          ]);
 
-      if (!reserved && !asset && !consumable) break;
+          if (!reserved && !asset && !consumable) break;
 
-      seq += 1;
-      serial = formatSerial(year2, seq);
+          seq += 1;
+          serial = formatSerial(year2, seq);
+        }
+
+        // 次回用にインクリメント
+        await tx.serialCounter.update({
+          where: { prefix },
+          data: { nextValue: seq + 1 },
+        });
+
+        // 予約を作成（既にあれば例外になる）
+        await tx.serialReservation.create({
+          data: {
+            serial,
+            type: q.type as TargetType,
+            // 認証未実装なので仮の user を作らず、reservedBy に固定値
+            // 将来ログイン導入後、req.user.id に置き換え
+            reservedBy: await getSystemUserId(),
+            expiresAt,
+          },
+        });
+
+        return { serial, expiresAt };
+      });
+
+      return reply.send(result);
+    } catch (e: any) {
+      // Prisma unique constraint error
+      if (e?.code === "P2002" && attempt < 4) continue;
+      throw e;
     }
+  }
 
-    // 次回用にインクリメント
-    await tx.serialCounter.update({
-      where: { prefix },
-      data: { nextValue: seq + 1 },
-    });
-
-    // 予約を作成（既にあれば例外になる）
-    await tx.serialReservation.create({
-      data: {
-        serial,
-        type: q.type as TargetType,
-        // 認証未実装なので仮の user を作らず、reservedBy に固定値
-        // 将来ログイン導入後、req.user.id に置き換え
-        reservedBy: await getSystemUserId(),
-        expiresAt,
-      },
-    });
-
-    return { serial, expiresAt };
-  });
-
-  return reply.send(result);
+  return reply.status(500).send({ error: "Serial reservation failed." });
 });
 
 /**
