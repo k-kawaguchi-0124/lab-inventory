@@ -57,6 +57,12 @@ function uniqueSorted(values: string[]) {
 
 let serialReservationClientIdColumnExistsCache: boolean | null = null;
 
+function isMissingClientIdColumnError(error: unknown) {
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2022") return true;
+  if (error instanceof Error && error.message.includes("clientId")) return true;
+  return false;
+}
+
 async function hasSerialReservationClientIdColumn() {
   if (serialReservationClientIdColumnExistsCache !== null) return serialReservationClientIdColumnExistsCache;
   try {
@@ -715,7 +721,7 @@ app.post("/locations", async (req, reply) => {
  */
 app.post("/serials/reserve", async (req, reply) => {
   const q = z.object({ type: z.enum(["ASSET", "CONSUMABLE"]) }).parse(req.query);
-  const supportsClientId = await hasSerialReservationClientIdColumn();
+  let supportsClientId = await hasSerialReservationClientIdColumn();
   const clientIdHeader = Array.isArray(req.headers["x-client-id"])
     ? req.headers["x-client-id"][0]
     : req.headers["x-client-id"];
@@ -737,22 +743,28 @@ app.post("/serials/reserve", async (req, reply) => {
   // 同じ端末(clientId)の未使用予約のみ再利用する。
   // 端末を跨いだ予約共有を防いで、同時アクセスでも衝突しにくくする。
   if (supportsClientId && clientId) {
-    const reusable = await prisma.serialReservation.findFirst({
-      where: {
-        type: q.type as TargetType,
-        reservedBy: systemUserId,
-        clientId,
-        expiresAt: { gte: now },
-      },
-      orderBy: { createdAt: "desc" },
-    });
-
-    if (reusable) {
-      await prisma.serialReservation.update({
-        where: { serial: reusable.serial },
-        data: { expiresAt },
+    try {
+      const reusable = await prisma.serialReservation.findFirst({
+        where: {
+          type: q.type as TargetType,
+          reservedBy: systemUserId,
+          clientId,
+          expiresAt: { gte: now },
+        },
+        orderBy: { createdAt: "desc" },
       });
-      return reply.send({ serial: reusable.serial, expiresAt });
+
+      if (reusable) {
+        await prisma.serialReservation.update({
+          where: { serial: reusable.serial },
+          data: { expiresAt },
+        });
+        return reply.send({ serial: reusable.serial, expiresAt });
+      }
+    } catch (e) {
+      if (!isMissingClientIdColumnError(e)) throw e;
+      supportsClientId = false;
+      serialReservationClientIdColumnExistsCache = false;
     }
   }
 
@@ -838,6 +850,12 @@ app.post("/serials/reserve", async (req, reply) => {
 
       return reply.send(result);
     } catch (e: any) {
+      if (supportsClientId && isMissingClientIdColumnError(e)) {
+        supportsClientId = false;
+        serialReservationClientIdColumnExistsCache = false;
+        attempt -= 1;
+        continue;
+      }
       // Prisma unique constraint error
       if (e?.code === "P2002" && attempt < 4) continue;
       throw e;
