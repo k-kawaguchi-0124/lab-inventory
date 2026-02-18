@@ -10,6 +10,7 @@ type Location = {
 };
 
 export function AssetCreatePage() {
+  const AUTO_RESERVE_GUARD_KEY = "asset-create-auto-reserve-ts";
   const [locations, setLocations] = useState<Location[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [budgets, setBudgets] = useState<string[]>([]);
@@ -51,6 +52,10 @@ export function AssetCreatePage() {
 
   useEffect(() => {
     if (serial || loading) return;
+    const now = Date.now();
+    const lastAutoReserve = Number(window.sessionStorage.getItem(AUTO_RESERVE_GUARD_KEY) ?? 0);
+    if (now - lastAutoReserve < 3000) return;
+    window.sessionStorage.setItem(AUTO_RESERVE_GUARD_KEY, String(now));
     reserveSerial(true).catch(() => undefined);
   }, []);
 

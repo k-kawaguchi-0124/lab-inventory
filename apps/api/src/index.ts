@@ -700,7 +700,48 @@ app.post("/serials/reserve", async (req, reply) => {
   const year2 = String(new Date().getFullYear()).slice(-2);
   const prefix = `${year2}`;
 
-  const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 15 * 60 * 1000);
+  const systemUserId = await getSystemUserId();
+
+  // 認証未実装の現状では SYSTEM ユーザの未使用予約を再利用する
+  // React StrictMode の二重実行やページ再読込で連番が飛ぶ問題を抑える
+  const reusable = await prisma.serialReservation.findFirst({
+    where: {
+      type: q.type as TargetType,
+      reservedBy: systemUserId,
+      expiresAt: { gte: now },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (reusable) {
+    await prisma.serialReservation.update({
+      where: { serial: reusable.serial },
+      data: { expiresAt },
+    });
+    return reply.send({ serial: reusable.serial, expiresAt });
+  }
+
+  // 期限切れで未使用の予約があれば再利用する
+  const reusableExpired = await prisma.serialReservation.findFirst({
+    where: {
+      type: q.type as TargetType,
+      expiresAt: { lt: now },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  if (reusableExpired) {
+    await prisma.serialReservation.update({
+      where: { serial: reusableExpired.serial },
+      data: {
+        reservedBy: systemUserId,
+        expiresAt,
+      },
+    });
+    return reply.send({ serial: reusableExpired.serial, expiresAt });
+  }
 
   // 同時実行競合で一時的にユニーク制約に触れる場合があるため、数回リトライする。
   for (let attempt = 0; attempt < 5; attempt += 1) {
@@ -744,7 +785,7 @@ app.post("/serials/reserve", async (req, reply) => {
             type: q.type as TargetType,
             // 認証未実装なので仮の user を作らず、reservedBy に固定値
             // 将来ログイン導入後、req.user.id に置き換え
-            reservedBy: await getSystemUserId(),
+            reservedBy: systemUserId,
             expiresAt,
           },
         });
