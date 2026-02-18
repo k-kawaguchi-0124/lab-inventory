@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiUrl } from "../lib/api";
 import { UiSelect } from "../components/UiSelect";
+import { apiErrorMessage, unknownErrorMessage } from "../lib/errors";
 
 type StaleType = "ASSET" | "CONSUMABLE" | "ALL";
 
@@ -41,11 +42,11 @@ export function StalePage() {
     setError(null);
     try {
       const res = await fetch(url);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw new Error(await apiErrorMessage(res, "長期未更新一覧の取得に失敗しました"));
       const json = (await res.json()) as StaleResponse;
       setData(json);
-    } catch (e: any) {
-      setError(e?.message ?? "failed");
+    } catch (e: unknown) {
+      setError(unknownErrorMessage(e, "長期未更新一覧の取得に失敗しました"));
       setData(null);
     } finally {
       setLoading(false);
@@ -91,7 +92,7 @@ export function StalePage() {
       {error && <p className="msg-err">{error}</p>}
 
       <div className="table-wrap">
-        <table className="data-table">
+        <table className="data-table stale-table">
           <thead>
             <tr>
               <th>Type</th>
@@ -110,12 +111,12 @@ export function StalePage() {
             ) : (
               data?.items?.map((x) => (
                 <tr key={`${x.type}:${x.id}`}>
-                  <td>{x.type}</td>
-                  <td className="mono">{x.serial}</td>
-                  <td>{x.name}</td>
-                  <td>{x.location ?? "-"}</td>
-                  <td>{x.user?.name ?? "-"}</td>
-                  <td>{x.daysSince}</td>
+                  <td data-label="Type">{x.type}</td>
+                  <td className="mono" data-label="Serial">{x.serial}</td>
+                  <td data-label="Name">{x.name}</td>
+                  <td data-label="Location">{x.location ?? "-"}</td>
+                  <td data-label="User">{x.user?.name ?? "-"}</td>
+                  <td data-label="Days">{x.daysSince}</td>
                 </tr>
               ))
             )}

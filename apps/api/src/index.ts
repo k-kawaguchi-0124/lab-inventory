@@ -1022,6 +1022,61 @@ app.get("/assets/:id", async (req, reply) => {
   return reply.send(asset);
 });
 
+app.get("/assets/:id/timeline", async (req, reply) => {
+  const params = z.object({ id: z.string().min(1) }).parse(req.params);
+  const asset = await prisma.asset.findUnique({ where: { id: params.id }, select: { id: true } });
+  if (!asset) return reply.status(404).send({ error: "Asset not found." });
+
+  const logs = await prisma.activityLog.findMany({
+    where: { targetType: "ASSET", targetId: params.id },
+    orderBy: { createdAt: "desc" },
+    take: 200,
+    include: {
+      actor: { select: { id: true, name: true } },
+    },
+  });
+
+  const locationIds = new Set<string>();
+  const userIds = new Set<string>();
+  for (const l of logs) {
+    if (l.fromLocationId) locationIds.add(l.fromLocationId);
+    if (l.toLocationId) locationIds.add(l.toLocationId);
+    if (l.fromUserId) userIds.add(l.fromUserId);
+    if (l.toUserId) userIds.add(l.toUserId);
+  }
+
+  const [locations, users] = await Promise.all([
+    locationIds.size
+      ? prisma.location.findMany({
+          where: { id: { in: [...locationIds] } },
+          select: { id: true, name: true },
+        })
+      : Promise.resolve([]),
+    userIds.size
+      ? prisma.user.findMany({
+          where: { id: { in: [...userIds] } },
+          select: { id: true, name: true },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  const locMap = new Map(locations.map((x) => [x.id, x]));
+  const userMap = new Map(users.map((x) => [x.id, x]));
+
+  return logs.map((l) => ({
+    id: l.id,
+    action: l.action,
+    note: l.note,
+    createdAt: l.createdAt,
+    actor: l.actor,
+    fromLocation: l.fromLocationId ? locMap.get(l.fromLocationId) ?? null : null,
+    toLocation: l.toLocationId ? locMap.get(l.toLocationId) ?? null : null,
+    fromUser: l.fromUserId ? userMap.get(l.fromUserId) ?? null : null,
+    toUser: l.toUserId ? userMap.get(l.toUserId) ?? null : null,
+    qtyDelta: l.qtyDelta,
+  }));
+});
+
 app.put("/assets/:id", async (req, reply) => {
   const params = z.object({ id: z.string().min(1) }).parse(req.params);
   const body = z

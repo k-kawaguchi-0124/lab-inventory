@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiUrl } from "../lib/api";
 import { UiSelect } from "../components/UiSelect";
+import { apiErrorMessage, unknownErrorMessage } from "../lib/errors";
 
 type Location = { id: string; name: string };
 
@@ -40,6 +41,8 @@ export function ConsumablesPage() {
   const [newLocation, setNewLocation] = useState("");
   const [showNewLocation, setShowNewLocation] = useState(false);
   const [note, setNote] = useState("");
+  const [qtyInputs, setQtyInputs] = useState<Record<string, string>>({});
+  const [pendingIds, setPendingIds] = useState<string[]>([]);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,11 +71,19 @@ export function ConsumablesPage() {
     setError(null);
     try {
       const res = await fetch(listUrl);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw new Error(await apiErrorMessage(res, "在庫一覧の取得に失敗しました"));
       const json = (await res.json()) as Consumable[];
       setItems(json);
+      setQtyInputs((prev) => {
+        const next: Record<string, string> = {};
+        for (const item of json) {
+          next[item.id] = prev[item.id] ?? String(item.currentQty);
+        }
+        return next;
+      });
+      setPendingIds((prev) => prev.filter((id) => json.some((x) => x.id === id)));
     } catch (e: any) {
-      setError(e?.message ?? "読み込みに失敗しました");
+      setError(unknownErrorMessage(e, "在庫一覧の取得に失敗しました"));
       setItems([]);
     } finally {
       setLoading(false);
@@ -117,7 +128,7 @@ export function ConsumablesPage() {
     }
     try {
       const reserveRes = await fetch(apiUrl("/serials/reserve?type=CONSUMABLE"), { method: "POST" });
-      if (!reserveRes.ok) throw new Error(`reserve HTTP ${reserveRes.status}`);
+      if (!reserveRes.ok) throw new Error(await apiErrorMessage(reserveRes, "シリアル予約に失敗しました"));
       const reserveJson = (await reserveRes.json()) as { serial: string };
 
       const res = await fetch(apiUrl("/consumables"), {
@@ -134,7 +145,7 @@ export function ConsumablesPage() {
           note: note.trim() ? note.trim() : undefined,
         }),
       });
-      if (!res.ok) throw new Error(`create HTTP ${res.status}`);
+      if (!res.ok) throw new Error(await apiErrorMessage(res, "消耗品の登録に失敗しました"));
 
       setMessage("消耗品を登録しました");
       setName("");
@@ -143,8 +154,8 @@ export function ConsumablesPage() {
       setNote("");
       await loadMaster();
       await loadItems();
-    } catch (e: any) {
-      setError(e?.message ?? "登録に失敗しました");
+    } catch (e: unknown) {
+      setError(unknownErrorMessage(e, "消耗品の登録に失敗しました"));
     }
   }
 
@@ -159,15 +170,15 @@ export function ConsumablesPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: value }),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw new Error(await apiErrorMessage(res, "保管場所の追加に失敗しました"));
       const created = (await res.json()) as Location;
       const next = [...locations, created].sort((a, b) => a.name.localeCompare(b.name, "ja"));
       setLocations(next);
       setLocationId(created.id);
       setNewLocation("");
       setShowNewLocation(false);
-    } catch (e: any) {
-      setError(e?.message ?? "保管場所の追加に失敗しました");
+    } catch (e: unknown) {
+      setError(unknownErrorMessage(e, "保管場所の追加に失敗しました"));
     }
   }
 
@@ -187,12 +198,56 @@ export function ConsumablesPage() {
         body: JSON.stringify({ delta }),
       });
       if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        throw new Error(errJson?.error ?? `HTTP ${res.status}`);
+        throw new Error(await apiErrorMessage(res, "数量更新に失敗しました"));
       }
       await loadItems();
-    } catch (e: any) {
-      setError(e?.message ?? "数量更新に失敗しました");
+    } catch (e: unknown) {
+      setError(unknownErrorMessage(e, "数量更新に失敗しました"));
+    }
+  }
+
+  function onChangeDirectQty(id: string, value: string, currentQtyValue: string | number) {
+    const normalized = normalizeIntegerInput(value);
+    setQtyInputs((prev) => ({ ...prev, [id]: normalized }));
+    const current = String(currentQtyValue);
+    setPendingIds((prev) => {
+      const has = prev.includes(id);
+      if (normalized === current) return has ? prev.filter((x) => x !== id) : prev;
+      return has ? prev : [...prev, id];
+    });
+  }
+
+  async function applyDirectQuantities() {
+    if (pendingIds.length === 0) {
+      setMessage("反映対象はありません");
+      return;
+    }
+    setError(null);
+    setMessage(null);
+    const index = new Map(items.map((x) => [x.id, x]));
+    try {
+      for (const id of pendingIds) {
+        const item = index.get(id);
+        if (!item) continue;
+        const target = Number(qtyInputs[id] ?? item.currentQty);
+        if (!Number.isInteger(target) || target < 0) {
+          throw new Error(`「${item.name}」の数量は0以上の整数で入力してください`);
+        }
+        const current = num(item.currentQty);
+        const delta = target - current;
+        if (delta === 0) continue;
+        const res = await fetch(apiUrl(`/consumables/${id}/adjust`), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ delta }),
+        });
+        if (!res.ok) throw new Error(await apiErrorMessage(res, `「${item.name}」の数量反映に失敗しました`));
+      }
+      setMessage(`数量を一括反映しました（${pendingIds.length}件）`);
+      setPendingIds([]);
+      await loadItems();
+    } catch (e: unknown) {
+      setError(unknownErrorMessage(e, "数量の一括反映に失敗しました"));
     }
   }
 
@@ -208,6 +263,9 @@ export function ConsumablesPage() {
           </label>
           <button className="btn btn-secondary" onClick={loadItems} disabled={loading}>
             更新
+          </button>
+          <button className="btn btn-primary" onClick={applyDirectQuantities} disabled={pendingIds.length === 0 || loading}>
+            数量を一括反映（{pendingIds.length}）
           </button>
         </div>
 
@@ -227,17 +285,18 @@ export function ConsumablesPage() {
                 <th>不足量</th>
                 <th>場所</th>
                 <th>更新</th>
+                <th>直接入力</th>
                 <th>数量操作</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={10}>読み込み中...</td>
+                  <td colSpan={11}>読み込み中...</td>
                 </tr>
               ) : items.length === 0 ? (
                 <tr>
-                  <td colSpan={10}>データがありません</td>
+                  <td colSpan={11}>データがありません</td>
                 </tr>
               ) : (
                 items.map((c) => {
@@ -263,6 +322,14 @@ export function ConsumablesPage() {
                       </td>
                       <td data-label="場所">{c.location?.name ?? c.locationId}</td>
                       <td data-label="更新">{new Date(c.lastActivityAt).toLocaleString("ja-JP")}</td>
+                      <td data-label="直接入力">
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={qtyInputs[c.id] ?? String(c.currentQty)}
+                          onChange={(e) => onChangeDirectQty(c.id, e.target.value, c.currentQty)}
+                        />
+                      </td>
                       <td data-label="数量操作">
                         <div className="qty-actions">
                           <button className="btn btn-secondary" onClick={() => adjustQuantity(c.id, -1)}>
@@ -321,6 +388,16 @@ export function ConsumablesPage() {
                     </span>
                     <span>
                       不足: {shortage} {c.unit}
+                    </span>
+                    <span>
+                      直接入力:
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={qtyInputs[c.id] ?? String(c.currentQty)}
+                        onChange={(e) => onChangeDirectQty(c.id, e.target.value, c.currentQty)}
+                        style={{ width: 84, marginLeft: 8 }}
+                      />
                     </span>
                   </div>
 

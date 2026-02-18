@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import { apiUrl } from "../lib/api";
 import { UiSelect } from "../components/UiSelect";
+import { apiErrorMessage, unknownErrorMessage } from "../lib/errors";
 
 type Location = { id: string; name: string };
 type User = { id: string; name: string; role: "ADMIN" | "MEMBER" };
@@ -45,15 +46,15 @@ export function AssetCheckinPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw new Error(await apiErrorMessage(res, "保管場所の追加に失敗しました"));
       const created = (await res.json()) as Location;
       const next = [...locations, created].sort((a, b) => a.name.localeCompare(b.name, "ja"));
       setLocations(next);
       setLocationId(created.id);
       setNewLocation("");
       setShowNewLocation(false);
-    } catch (e: any) {
-      setError(e?.message ?? "保管場所の追加に失敗しました");
+    } catch (e: unknown) {
+      setError(unknownErrorMessage(e, "保管場所の追加に失敗しました"));
     }
   }
 
@@ -118,12 +119,12 @@ export function AssetCheckinPage() {
           note: note.trim() ? note : undefined,
         }),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw new Error(await apiErrorMessage(res, "返却の登録に失敗しました"));
       setMessage("返却を更新しました");
       setAssetId("");
       setNote("");
-    } catch (err: any) {
-      setError(err?.message ?? "更新に失敗しました");
+    } catch (err: unknown) {
+      setError(unknownErrorMessage(err, "返却の登録に失敗しました"));
     } finally {
       setLoading(false);
     }

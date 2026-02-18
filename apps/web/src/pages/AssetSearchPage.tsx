@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { apiUrl } from "../lib/api";
+import { apiErrorMessage, unknownErrorMessage } from "../lib/errors";
 
 type Asset = {
   id: string;
@@ -42,7 +43,7 @@ export function AssetSearchPage() {
     setError(null);
     fetch(url)
       .then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        if (!r.ok) throw new Error(`検索結果の取得に失敗しました: HTTP ${r.status}`);
         return r.json();
       })
       .then((json: Asset[]) => setItems(json))
@@ -58,11 +59,11 @@ export function AssetSearchPage() {
     setError(null);
     try {
       const r = await fetch(url);
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      if (!r.ok) throw new Error(await apiErrorMessage(r, "検索結果の取得に失敗しました"));
       const json = (await r.json()) as Asset[];
       setItems(json);
-    } catch (e: any) {
-      setError(e?.message ?? "読み込みに失敗しました");
+    } catch (e: unknown) {
+      setError(unknownErrorMessage(e, "検索結果の取得に失敗しました"));
       setItems([]);
     } finally {
       setLoading(false);
@@ -96,12 +97,11 @@ export function AssetSearchPage() {
     try {
       const res = await fetch(apiUrl(`/assets/${selectedAsset.id}`), { method: "DELETE" });
       if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        throw new Error(errJson?.error ?? `HTTP ${res.status}`);
+        throw new Error(await apiErrorMessage(res, "物品の削除に失敗しました"));
       }
       await reload();
-    } catch (e: any) {
-      setError(e?.message ?? "削除に失敗しました");
+    } catch (e: unknown) {
+      setError(unknownErrorMessage(e, "物品の削除に失敗しました"));
     } finally {
       setActionLoading(false);
     }
@@ -167,7 +167,7 @@ export function AssetSearchPage() {
       </div>
 
       <div className="table-wrap">
-        <table className="data-table table-wide">
+        <table className="data-table table-wide asset-search-table">
           <thead>
             <tr>
               <th>選択</th>
@@ -194,20 +194,20 @@ export function AssetSearchPage() {
             ) : (
               items.map((a) => (
                 <tr key={a.id} className={selectedAssetId === a.id ? "row-selected" : ""}>
-                  <td>
+                  <td data-label="選択">
                     <button type="button" className="btn btn-secondary" onClick={() => setSelectedAssetId(a.id)}>
                       選択
                     </button>
                   </td>
-                  <td className="mono">{a.serial}</td>
-                  <td>{a.name}</td>
-                  <td>{a.category}</td>
-                  <td>{a.budgetCode ?? "-"}</td>
-                  <td>{a.purchasedAt ? new Date(a.purchasedAt).toLocaleDateString("ja-JP") : "-"}</td>
-                  <td>{a.currentLocation?.name ?? a.currentLocationId}</td>
-                  <td>{a.currentUser?.name ?? (a.currentUserId ? a.currentUserId : "-")}</td>
-                  <td>{a.status}</td>
-                  <td>{new Date(a.lastActivityAt).toLocaleString("ja-JP")}</td>
+                  <td className="mono" data-label="Serial">{a.serial}</td>
+                  <td data-label="Name">{a.name}</td>
+                  <td data-label="Category">{a.category}</td>
+                  <td data-label="予算">{a.budgetCode ?? "-"}</td>
+                  <td data-label="購入日">{a.purchasedAt ? new Date(a.purchasedAt).toLocaleDateString("ja-JP") : "-"}</td>
+                  <td data-label="Location">{a.currentLocation?.name ?? a.currentLocationId}</td>
+                  <td data-label="User">{a.currentUser?.name ?? (a.currentUserId ? a.currentUserId : "-")}</td>
+                  <td data-label="Status">{a.status}</td>
+                  <td data-label="Last Activity">{new Date(a.lastActivityAt).toLocaleString("ja-JP")}</td>
                 </tr>
               ))
             )}

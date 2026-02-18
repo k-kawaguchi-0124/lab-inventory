@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiUrl } from "../lib/api";
 import { UiSelect } from "../components/UiSelect";
+import { apiErrorMessage, unknownErrorMessage } from "../lib/errors";
 
 type Asset = {
   id: string;
@@ -21,6 +22,8 @@ type Asset = {
 export function AssetListPage() {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
+  const [candidates, setCandidates] = useState<Asset[]>([]);
+  const [candidateLoading, setCandidateLoading] = useState(false);
   const [items, setItems] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,11 +41,11 @@ export function AssetListPage() {
     setError(null);
     try {
       const res = await fetch(listUrl);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw new Error(await apiErrorMessage(res, "物品一覧の取得に失敗しました"));
       const json = (await res.json()) as Asset[];
       setItems(json);
-    } catch (e: any) {
-      setError(e?.message ?? "failed");
+    } catch (e: unknown) {
+      setError(unknownErrorMessage(e, "物品一覧の取得に失敗しました"));
       setItems([]);
     } finally {
       setLoading(false);
@@ -53,18 +56,62 @@ export function AssetListPage() {
     load();
   }, [listUrl]);
 
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) {
+      setCandidates([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setCandidateLoading(true);
+      try {
+        const res = await fetch(apiUrl(`/assets?query=${encodeURIComponent(q)}&take=8`));
+        if (!res.ok) throw new Error();
+        const json = (await res.json()) as Asset[];
+        setCandidates(json);
+      } catch {
+        setCandidates([]);
+      } finally {
+        setCandidateLoading(false);
+      }
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [query]);
+
   return (
     <section className="panel">
       <h1 className="panel-title">研究室内 物品一覧</h1>
       <p className="panel-subtitle">検索しなくても、登録済み備品を一覧で確認できます。</p>
 
       <div className="search-row">
-        <input
-          className="input"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="名称 / シリアル / カテゴリ / 予算で絞り込み"
-        />
+        <div className="autocomplete-wrap">
+          <input
+            className="input"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="名称 / シリアル / カテゴリ / 予算で絞り込み"
+          />
+          {candidateLoading && <div className="autocomplete-hint">候補を検索中...</div>}
+          {!candidateLoading && candidates.length > 0 && (
+            <div className="autocomplete-list">
+              {candidates.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  className="autocomplete-item"
+                  onClick={() => {
+                    setQuery(c.serial);
+                    setCandidates([]);
+                  }}
+                >
+                  <span>{c.name}</span>
+                  <span className="mono">{c.serial}</span>
+                  <span>{c.status}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <UiSelect
           value={status}
           onChange={setStatus}
@@ -84,7 +131,7 @@ export function AssetListPage() {
       {error && <p className="msg-err">{error}</p>}
 
       <div className="table-wrap">
-        <table className="data-table">
+        <table className="data-table assets-list-table">
           <thead>
             <tr>
               <th>Serial</th>
@@ -110,23 +157,23 @@ export function AssetListPage() {
             ) : (
               items.map((a) => (
                 <tr key={a.id}>
-                  <td className="mono">
+                  <td className="mono" data-label="Serial">
                     <Link className="link-inline" to={`/assets/${a.id}/edit`}>
                       {a.serial}
                     </Link>
                   </td>
-                  <td>
+                  <td data-label="Name">
                     <Link className="link-inline" to={`/assets/${a.id}/edit`}>
                       {a.name}
                     </Link>
                   </td>
-                  <td>{a.category}</td>
-                  <td>{a.budgetCode ?? "-"}</td>
-                  <td>{a.purchasedAt ? new Date(a.purchasedAt).toLocaleDateString("ja-JP") : "-"}</td>
-                  <td>{a.currentLocation?.name ?? a.currentLocationId}</td>
-                  <td>{a.currentUser?.name ?? (a.currentUserId ? a.currentUserId : "-")}</td>
-                  <td>{a.status}</td>
-                  <td>{new Date(a.lastActivityAt).toLocaleString("ja-JP")}</td>
+                  <td data-label="Category">{a.category}</td>
+                  <td data-label="予算">{a.budgetCode ?? "-"}</td>
+                  <td data-label="購入日">{a.purchasedAt ? new Date(a.purchasedAt).toLocaleDateString("ja-JP") : "-"}</td>
+                  <td data-label="Location">{a.currentLocation?.name ?? a.currentLocationId}</td>
+                  <td data-label="User">{a.currentUser?.name ?? (a.currentUserId ? a.currentUserId : "-")}</td>
+                  <td data-label="Status">{a.status}</td>
+                  <td data-label="Last Activity">{new Date(a.lastActivityAt).toLocaleString("ja-JP")}</td>
                 </tr>
               ))
             )}

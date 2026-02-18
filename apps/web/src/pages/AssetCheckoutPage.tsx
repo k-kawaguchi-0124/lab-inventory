@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import { apiUrl } from "../lib/api";
 import { UiSelect } from "../components/UiSelect";
+import { apiErrorMessage, unknownErrorMessage } from "../lib/errors";
 
 type Location = { id: string; name: string };
 type User = { id: string; name: string };
@@ -40,15 +41,15 @@ export function AssetCheckoutPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw new Error(await apiErrorMessage(res, "保管場所の追加に失敗しました"));
       const created = (await res.json()) as Location;
       const next = [...locations, created].sort((a, b) => a.name.localeCompare(b.name, "ja"));
       setLocations(next);
       setLocationId(created.id);
       setNewLocation("");
       setShowNewLocation(false);
-    } catch (e: any) {
-      setError(e?.message ?? "保管場所の追加に失敗しました");
+    } catch (e: unknown) {
+      setError(unknownErrorMessage(e, "保管場所の追加に失敗しました"));
     }
   }
 
@@ -84,7 +85,7 @@ export function AssetCheckoutPage() {
       setCandidateLoading(true);
       try {
         const res = await fetch(apiUrl(`/assets?status=AVAILABLE&query=${encodeURIComponent(q)}&take=8`));
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) throw new Error();
         const json = (await res.json()) as AssetCandidate[];
         setAssetCandidates(json);
       } catch {
@@ -116,12 +117,14 @@ export function AssetCheckoutPage() {
           note: note.trim() ? note : undefined,
         }),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw new Error(await apiErrorMessage(res, "貸出の登録に失敗しました"));
       setMessage("貸出を更新しました");
       setAssetId("");
+      setAssetQuery("");
+      setAssetCandidates([]);
       setNote("");
-    } catch (err: any) {
-      setError(err?.message ?? "更新に失敗しました");
+    } catch (err: unknown) {
+      setError(unknownErrorMessage(err, "貸出の登録に失敗しました"));
     } finally {
       setLoading(false);
     }
@@ -163,7 +166,7 @@ export function AssetCheckoutPage() {
           {assetId && <small>選択済みの備品ID: {assetId}</small>}
         </label>
         <label className="field">
-          <span>貸出先ユーザー</span>
+          <span>貸出先ユーザ</span>
           <UiSelect
             value={userId}
             onChange={setUserId}

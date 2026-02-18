@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { apiUrl } from "../lib/api";
 import { UiSelect } from "../components/UiSelect";
+import { apiErrorMessage, unknownErrorMessage } from "../lib/errors";
 
 type Asset = {
   id: string;
@@ -19,6 +20,19 @@ type Asset = {
 type Location = {
   id: string;
   name: string;
+};
+
+type TimelineItem = {
+  id: string;
+  action: string;
+  note: string | null;
+  createdAt: string;
+  actor: { id: string; name: string } | null;
+  fromLocation: { id: string; name: string } | null;
+  toLocation: { id: string; name: string } | null;
+  fromUser: { id: string; name: string } | null;
+  toUser: { id: string; name: string } | null;
+  qtyDelta: string | number | null;
 };
 
 function toDateInputValue(value: string | null) {
@@ -47,6 +61,8 @@ export function AssetEditPage() {
   const [purchasedAt, setPurchasedAt] = useState("");
   const [note, setNote] = useState("");
   const [locationId, setLocationId] = useState("");
+  const [timeline, setTimeline] = useState<TimelineItem[]>([]);
+  const [loadingTimeline, setLoadingTimeline] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -85,8 +101,21 @@ export function AssetEditPage() {
         setNote(a.note ?? "");
         setLocationId(a.currentLocationId || l[0]?.id || "");
       })
-      .catch((e: any) => setError(e?.message ?? "読み込みに失敗しました"))
+      .catch((e: unknown) => setError(unknownErrorMessage(e, "物品情報の読み込みに失敗しました")))
       .finally(() => setLoading(false));
+  }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+    setLoadingTimeline(true);
+    fetch(apiUrl(`/assets/${id}/timeline`))
+      .then(async (res) => {
+        if (!res.ok) throw new Error(await apiErrorMessage(res, "履歴の取得に失敗しました"));
+        return (await res.json()) as TimelineItem[];
+      })
+      .then((items) => setTimeline(items))
+      .catch(() => setTimeline([]))
+      .finally(() => setLoadingTimeline(false));
   }, [id]);
 
   function addCategory() {
@@ -121,15 +150,15 @@ export function AssetEditPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw new Error(await apiErrorMessage(res, "保管場所の追加に失敗しました"));
       const created = (await res.json()) as Location;
       const next = [...locations, created].sort((a, b) => a.name.localeCompare(b.name, "ja"));
       setLocations(next);
       setLocationId(created.id);
       setNewLocation("");
       setShowNewLocation(false);
-    } catch (e: any) {
-      setError(e?.message ?? "保管場所の追加に失敗しました");
+    } catch (e: unknown) {
+      setError(unknownErrorMessage(e, "保管場所の追加に失敗しました"));
     }
   }
 
@@ -152,10 +181,10 @@ export function AssetEditPage() {
           note: note.trim() ? note : null,
         }),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw new Error(await apiErrorMessage(res, "物品情報の更新に失敗しました"));
       setMessage("更新しました");
-    } catch (err: any) {
-      setError(err?.message ?? "更新に失敗しました");
+    } catch (err: unknown) {
+      setError(unknownErrorMessage(err, "物品情報の更新に失敗しました"));
     } finally {
       setLoading(false);
     }
@@ -171,12 +200,11 @@ export function AssetEditPage() {
     try {
       const res = await fetch(apiUrl(`/assets/${id}`), { method: "DELETE" });
       if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        throw new Error(errJson?.error ?? `HTTP ${res.status}`);
+        throw new Error(await apiErrorMessage(res, "物品の削除に失敗しました"));
       }
       navigate("/assets");
-    } catch (err: any) {
-      setError(err?.message ?? "削除に失敗しました");
+    } catch (err: unknown) {
+      setError(unknownErrorMessage(err, "物品の削除に失敗しました"));
     } finally {
       setLoading(false);
     }
@@ -309,6 +337,34 @@ export function AssetEditPage() {
       </form>
 
       {loading && <p>読み込み中...</p>}
+      <section className="timeline-panel">
+        <h2 className="panel-title">履歴タイムライン</h2>
+        {loadingTimeline ? (
+          <p>履歴を読み込み中...</p>
+        ) : timeline.length === 0 ? (
+          <p>履歴はありません</p>
+        ) : (
+          <div className="timeline-list">
+            {timeline.map((t) => (
+              <article key={t.id} className="timeline-item">
+                <p className="timeline-head">
+                  <strong>{t.action}</strong> / {new Date(t.createdAt).toLocaleString("ja-JP")}
+                </p>
+                <p className="timeline-meta">
+                  実行者: {t.actor?.name ?? "-"} / 場所: {t.fromLocation?.name ?? "-"} → {t.toLocation?.name ?? "-"}
+                </p>
+                {(t.fromUser || t.toUser) && (
+                  <p className="timeline-meta">
+                    ユーザ: {t.fromUser?.name ?? "-"} → {t.toUser?.name ?? "-"}
+                  </p>
+                )}
+                {t.qtyDelta !== null && <p className="timeline-meta">数量変化: {String(t.qtyDelta)}</p>}
+                {t.note && <p className="timeline-note">{t.note}</p>}
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
       {message && <p className="msg-ok">{message}</p>}
       {error && <p className="msg-err">{error}</p>}
     </section>
