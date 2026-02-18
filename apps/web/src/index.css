@@ -623,7 +623,7 @@ select option {
   padding: 10px;
   border-bottom: 1px solid #ebf0f8;
   text-align: left;
-  vertical-align: top;
+  vertical-align: middle;
 }
 
 .data-table th {
