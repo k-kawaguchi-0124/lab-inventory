@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import { apiUrl } from "../lib/api";
 import { UiSelect } from "../components/UiSelect";
 import { apiErrorMessage, unknownErrorMessage } from "../lib/errors";
+import { getClientId } from "../lib/clientId";
 
 type Location = {
   id: string;
@@ -108,7 +109,10 @@ export function AssetCreatePage() {
     setError(null);
     if (!silent) setMessage(null);
     try {
-      const res = await fetch(apiUrl("/serials/reserve?type=ASSET"), { method: "POST" });
+      const res = await fetch(apiUrl("/serials/reserve?type=ASSET"), {
+        method: "POST",
+        headers: { "x-client-id": getClientId() },
+      });
       if (!res.ok) throw new Error(await apiErrorMessage(res, "シリアル予約に失敗しました"));
       const json = (await res.json()) as { serial: string; expiresAt: string };
       setSerial(json.serial);

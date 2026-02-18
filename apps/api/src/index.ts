@@ -694,6 +694,14 @@ app.post("/locations", async (req, reply) => {
  */
 app.post("/serials/reserve", async (req, reply) => {
   const q = z.object({ type: z.enum(["ASSET", "CONSUMABLE"]) }).parse(req.query);
+  const clientIdHeader = Array.isArray(req.headers["x-client-id"])
+    ? req.headers["x-client-id"][0]
+    : req.headers["x-client-id"];
+  const normalizedClientId =
+    typeof clientIdHeader === "string"
+      ? clientIdHeader.trim().replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64)
+      : "";
+  const clientId = normalizedClientId.length > 0 ? normalizedClientId : null;
 
   // 年度prefixは「西暦下2桁」。
   // シリアル文字列は type を含まないため、カウンタはタイプ別に分けず共通化して衝突を防ぐ。
@@ -704,43 +712,55 @@ app.post("/serials/reserve", async (req, reply) => {
   const expiresAt = new Date(now.getTime() + 15 * 60 * 1000);
   const systemUserId = await getSystemUserId();
 
-  // 認証未実装の現状では SYSTEM ユーザの未使用予約を再利用する
-  // React StrictMode の二重実行やページ再読込で連番が飛ぶ問題を抑える
-  const reusable = await prisma.serialReservation.findFirst({
-    where: {
-      type: q.type as TargetType,
-      reservedBy: systemUserId,
-      expiresAt: { gte: now },
-    },
-    orderBy: { createdAt: "desc" },
-  });
-
-  if (reusable) {
-    await prisma.serialReservation.update({
-      where: { serial: reusable.serial },
-      data: { expiresAt },
+  // 同じ端末(clientId)の未使用予約のみ再利用する。
+  // 端末を跨いだ予約共有を防いで、同時アクセスでも衝突しにくくする。
+  if (clientId) {
+    const reusable = await prisma.serialReservation.findFirst({
+      where: {
+        type: q.type as TargetType,
+        reservedBy: systemUserId,
+        clientId,
+        expiresAt: { gte: now },
+      },
+      orderBy: { createdAt: "desc" },
     });
-    return reply.send({ serial: reusable.serial, expiresAt });
+
+    if (reusable) {
+      await prisma.serialReservation.update({
+        where: { serial: reusable.serial },
+        data: { expiresAt },
+      });
+      return reply.send({ serial: reusable.serial, expiresAt });
+    }
   }
 
   // 期限切れで未使用の予約があれば再利用する
-  const reusableExpired = await prisma.serialReservation.findFirst({
-    where: {
-      type: q.type as TargetType,
-      expiresAt: { lt: now },
-    },
-    orderBy: { createdAt: "asc" },
-  });
+  for (let reuseAttempt = 0; reuseAttempt < 5; reuseAttempt += 1) {
+    const reusableExpired = await prisma.serialReservation.findFirst({
+      where: {
+        type: q.type as TargetType,
+        expiresAt: { lt: now },
+      },
+      orderBy: { createdAt: "asc" },
+    });
 
-  if (reusableExpired) {
-    await prisma.serialReservation.update({
-      where: { serial: reusableExpired.serial },
+    if (!reusableExpired) break;
+
+    const updated = await prisma.serialReservation.updateMany({
+      where: {
+        serial: reusableExpired.serial,
+        expiresAt: { lt: now },
+      },
       data: {
         reservedBy: systemUserId,
+        clientId,
         expiresAt,
       },
     });
-    return reply.send({ serial: reusableExpired.serial, expiresAt });
+
+    if (updated.count === 1) {
+      return reply.send({ serial: reusableExpired.serial, expiresAt });
+    }
   }
 
   // 同時実行競合で一時的にユニーク制約に触れる場合があるため、数回リトライする。
@@ -786,6 +806,7 @@ app.post("/serials/reserve", async (req, reply) => {
             // 認証未実装なので仮の user を作らず、reservedBy に固定値
             // 将来ログイン導入後、req.user.id に置き換え
             reservedBy: systemUserId,
+            clientId,
             expiresAt,
           },
         });

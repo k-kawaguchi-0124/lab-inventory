@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { apiUrl } from "../lib/api";
 import { UiSelect } from "../components/UiSelect";
 import { apiErrorMessage, unknownErrorMessage } from "../lib/errors";
+import { getClientId } from "../lib/clientId";
 
 type Location = { id: string; name: string };
 
@@ -125,7 +126,10 @@ export function ConsumablesPage() {
       return;
     }
     try {
-      const reserveRes = await fetch(apiUrl("/serials/reserve?type=CONSUMABLE"), { method: "POST" });
+      const reserveRes = await fetch(apiUrl("/serials/reserve?type=CONSUMABLE"), {
+        method: "POST",
+        headers: { "x-client-id": getClientId() },
+      });
       if (!reserveRes.ok) throw new Error(await apiErrorMessage(reserveRes, "シリアル予約に失敗しました"));
       const reserveJson = (await reserveRes.json()) as { serial: string };
 

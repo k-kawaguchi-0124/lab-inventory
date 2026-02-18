@@ -196,12 +196,14 @@ model SerialReservation {
   serial     String   @id
   type       TargetType
   reservedBy String
+  clientId   String?
   expiresAt  DateTime
   createdAt  DateTime @default(now())
 
   user User @relation(fields: [reservedBy], references: [id])
 
   @@index([expiresAt])
+  @@index([type, clientId, expiresAt])
 }
 
 enum AlertType {
