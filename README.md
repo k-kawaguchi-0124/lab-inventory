@@ -148,12 +148,19 @@ npm run dev -- --host 0.0.0.0
 ## systemd で常駐運用
 
 `deploy/systemd` にユニットと補助スクリプトを用意しています。
+設定は `/etc/default/lab-inventory` で一元管理します（`REPO_DIR` など）。
 
 ### サービス導入
 
 ```bash
 cd /opt/lab-inventory
 ./deploy/systemd/install-services.sh
+```
+
+必要に応じて設定を編集:
+
+```bash
+sudo vi /etc/default/lab-inventory
 ```
 
 ### 起動/停止
@@ -179,7 +186,7 @@ journalctl -u lab-inventory-web.service -f
 ### 更新反映（推奨）
 
 ```bash
-cd /opt/lab-inventory
+cd /path/to/your/repo
 ./deploy/systemd/update-and-restart.sh
 ```
 
@@ -204,7 +211,7 @@ git push origin main
 ### B. サーバ側
 
 ```bash
-cd /opt/lab-inventory
+cd /path/to/your/repo
 ./deploy/systemd/update-and-restart.sh
 ```
 

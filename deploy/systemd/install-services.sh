@@ -4,6 +4,15 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 UNIT_DIR="/etc/systemd/system"
 APP_USER="${SUDO_USER:-$USER}"
+ENV_DEST="/etc/default/lab-inventory"
+ENV_TEMPLATE="$ROOT_DIR/deploy/systemd/lab-inventory.env.example"
+
+if [[ ! -f "$ENV_DEST" ]]; then
+  tmp_env="/tmp/lab-inventory.env"
+  sed "s#__REPO_DIR__#${ROOT_DIR}#g" "$ENV_TEMPLATE" > "$tmp_env"
+  sudo cp "$tmp_env" "$ENV_DEST"
+  rm -f "$tmp_env"
+fi
 
 for unit in lab-inventory-api.service lab-inventory-web.service; do
   src="$ROOT_DIR/deploy/systemd/$unit"
@@ -18,6 +27,10 @@ sudo systemctl enable lab-inventory-api.service lab-inventory-web.service
 
 cat <<MSG
 Installed systemd units with app user: ${APP_USER}
+Config file:
+  ${ENV_DEST}
+
+If you moved the repo, edit REPO_DIR in ${ENV_DEST}.
 
 Next:
   sudo systemctl start lab-inventory-api.service

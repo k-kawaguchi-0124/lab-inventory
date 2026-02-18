@@ -7,10 +7,9 @@ Requires=network.target
 Type=simple
 User=__APP_USER__
 Group=__APP_USER__
-WorkingDirectory=/opt/lab-inventory/apps/api
 Environment=NODE_ENV=development
-EnvironmentFile=-/opt/lab-inventory/apps/api/.env
-ExecStart=/usr/bin/npm run dev
+EnvironmentFile=-/etc/default/lab-inventory
+ExecStart=/usr/bin/bash -lc 'set -a; [ -f "${REPO_DIR:-/opt/lab-inventory}/apps/api/.env" ] && . "${REPO_DIR:-/opt/lab-inventory}/apps/api/.env"; set +a; cd "${REPO_DIR:-/opt/lab-inventory}/apps/api" && npm run dev'
 Restart=always
 RestartSec=3
 
