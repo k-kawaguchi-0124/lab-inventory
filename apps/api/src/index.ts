@@ -55,6 +55,27 @@ function uniqueSorted(values: string[]) {
   return [...new Set(values.map((v) => v.trim()).filter((v) => v.length > 0))].sort((a, b) => a.localeCompare(b, "ja"));
 }
 
+let serialReservationClientIdColumnExistsCache: boolean | null = null;
+
+async function hasSerialReservationClientIdColumn() {
+  if (serialReservationClientIdColumnExistsCache !== null) return serialReservationClientIdColumnExistsCache;
+  try {
+    const rows = await prisma.$queryRaw<Array<{ exists: boolean }>>`
+      SELECT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'SerialReservation'
+          AND column_name = 'clientId'
+      ) AS "exists"
+    `;
+    serialReservationClientIdColumnExistsCache = Boolean(rows[0]?.exists);
+  } catch {
+    serialReservationClientIdColumnExistsCache = false;
+  }
+  return serialReservationClientIdColumnExistsCache;
+}
+
 app.get("/health", async () => ({ ok: true }));
 
 app.get("/users", async () => {
@@ -694,6 +715,7 @@ app.post("/locations", async (req, reply) => {
  */
 app.post("/serials/reserve", async (req, reply) => {
   const q = z.object({ type: z.enum(["ASSET", "CONSUMABLE"]) }).parse(req.query);
+  const supportsClientId = await hasSerialReservationClientIdColumn();
   const clientIdHeader = Array.isArray(req.headers["x-client-id"])
     ? req.headers["x-client-id"][0]
     : req.headers["x-client-id"];
@@ -701,7 +723,7 @@ app.post("/serials/reserve", async (req, reply) => {
     typeof clientIdHeader === "string"
       ? clientIdHeader.trim().replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64)
       : "";
-  const clientId = normalizedClientId.length > 0 ? normalizedClientId : null;
+  const clientId = supportsClientId && normalizedClientId.length > 0 ? normalizedClientId : null;
 
   // 年度prefixは「西暦下2桁」。
   // シリアル文字列は type を含まないため、カウンタはタイプ別に分けず共通化して衝突を防ぐ。
@@ -714,7 +736,7 @@ app.post("/serials/reserve", async (req, reply) => {
 
   // 同じ端末(clientId)の未使用予約のみ再利用する。
   // 端末を跨いだ予約共有を防いで、同時アクセスでも衝突しにくくする。
-  if (clientId) {
+  if (supportsClientId && clientId) {
     const reusable = await prisma.serialReservation.findFirst({
       where: {
         type: q.type as TargetType,
@@ -753,7 +775,7 @@ app.post("/serials/reserve", async (req, reply) => {
       },
       data: {
         reservedBy: systemUserId,
-        clientId,
+        ...(supportsClientId ? { clientId } : {}),
         expiresAt,
       },
     });
@@ -806,7 +828,7 @@ app.post("/serials/reserve", async (req, reply) => {
             // 認証未実装なので仮の user を作らず、reservedBy に固定値
             // 将来ログイン導入後、req.user.id に置き換え
             reservedBy: systemUserId,
-            clientId,
+            ...(supportsClientId ? { clientId } : {}),
             expiresAt,
           },
         });
