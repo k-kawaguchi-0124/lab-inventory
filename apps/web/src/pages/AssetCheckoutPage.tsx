@@ -14,6 +14,14 @@ type AssetCandidate = {
   status: string;
 };
 
+type AssetDetail = {
+  id: string;
+  serial: string;
+  name: string;
+  status: string;
+  currentLocationId: string;
+};
+
 export function AssetCheckoutPage() {
   const LAST_CHECKOUT_LOCATION_KEY = "asset-checkout-last-location-id";
   const [searchParams] = useSearchParams();
@@ -109,6 +117,22 @@ export function AssetCheckoutPage() {
     return () => clearTimeout(timer);
   }, [assetQuery]);
 
+  useEffect(() => {
+    if (!assetId) {
+      return;
+    }
+    fetch(apiUrl(`/assets/${assetId}`))
+      .then(async (res) => {
+        if (!res.ok) throw new Error(await apiErrorMessage(res, "物品情報の取得に失敗しました"));
+        const json = (await res.json()) as AssetDetail;
+        setAssetQuery(`${json.name} / ${json.serial}`);
+        if (json.currentLocationId) {
+          setLocationId(json.currentLocationId);
+        }
+      })
+      .catch(() => undefined);
+  }, [assetId]);
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (!assetId) {
@@ -151,7 +175,10 @@ export function AssetCheckoutPage() {
           <span>備品検索（名称 / シリアル）</span>
           <input
             value={assetQuery}
-            onChange={(e) => setAssetQuery(e.target.value)}
+            onChange={(e) => {
+              setAssetQuery(e.target.value);
+              setAssetId("");
+            }}
             placeholder="例: Raspi4 / 26000001"
           />
           {candidateLoading && <small>候補を検索中...</small>}
@@ -174,7 +201,6 @@ export function AssetCheckoutPage() {
               ))}
             </div>
           )}
-          {assetId && <small>選択済みの備品ID: {assetId}</small>}
         </label>
         <label className="field">
           <span>貸出先ユーザ</span>
