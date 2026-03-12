@@ -22,6 +22,11 @@ type Location = {
   name: string;
 };
 
+type User = {
+  id: string;
+  name: string;
+};
+
 type TimelineItem = {
   id: string;
   action: string;
@@ -62,6 +67,13 @@ export function AssetEditPage() {
   const [note, setNote] = useState("");
   const [locationId, setLocationId] = useState("");
   const [timeline, setTimeline] = useState<TimelineItem[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [checkoutUserId, setCheckoutUserId] = useState("");
+  const [checkoutLocationId, setCheckoutLocationId] = useState("");
+  const [checkoutNote, setCheckoutNote] = useState("");
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [checkoutMessage, setCheckoutMessage] = useState<string | null>(null);
   const [loadingTimeline, setLoadingTimeline] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -76,16 +88,19 @@ export function AssetEditPage() {
       fetch(apiUrl("/locations")),
       fetch(apiUrl("/asset-categories")),
       fetch(apiUrl("/asset-budgets")),
+      fetch(apiUrl("/users")),
     ])
-      .then(async ([aRes, lRes, cRes, bRes]) => {
+      .then(async ([aRes, lRes, cRes, bRes, uRes]) => {
         if (!aRes.ok) throw new Error(`asset HTTP ${aRes.status}`);
         if (!lRes.ok) throw new Error(`locations HTTP ${lRes.status}`);
         if (!cRes.ok) throw new Error(`categories HTTP ${cRes.status}`);
         if (!bRes.ok) throw new Error(`budgets HTTP ${bRes.status}`);
+        if (!uRes.ok) throw new Error(`users HTTP ${uRes.status}`);
         const a = (await aRes.json()) as Asset;
         const l = (await lRes.json()) as Location[];
         const c = (await cRes.json()) as { items?: string[] };
         const b = (await bRes.json()) as { items?: string[] };
+        const u = (await uRes.json()) as User[];
         const catItems = (c.items ?? []).filter((x) => x.trim().length > 0);
         const budgetItems = (b.items ?? []).filter((x) => x.trim().length > 0);
         if (a.category && !catItems.includes(a.category)) catItems.push(a.category);
@@ -100,6 +115,8 @@ export function AssetEditPage() {
         setPurchasedAt(toDateInputValue(a.purchasedAt));
         setNote(a.note ?? "");
         setLocationId(a.currentLocationId || l[0]?.id || "");
+        setUsers(u);
+        setCheckoutLocationId(a.currentLocationId || l[0]?.id || "");
       })
       .catch((e: unknown) => setError(unknownErrorMessage(e, "物品情報の読み込みに失敗しました")))
       .finally(() => setLoading(false));
@@ -207,6 +224,56 @@ export function AssetEditPage() {
       setError(unknownErrorMessage(err, "物品の削除に失敗しました"));
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function onCheckout(e: FormEvent) {
+    e.preventDefault();
+    if (!id) return;
+    if (!checkoutUserId) {
+      setCheckoutError("貸出先ユーザを選択してください");
+      return;
+    }
+    if (!checkoutLocationId) {
+      setCheckoutError("貸出時の場所を選択してください");
+      return;
+    }
+    setCheckoutLoading(true);
+    setCheckoutError(null);
+    setCheckoutMessage(null);
+    try {
+      const res = await fetch(apiUrl(`/assets/${id}/checkout`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: checkoutUserId,
+          locationId: checkoutLocationId,
+          note: checkoutNote.trim() ? checkoutNote : undefined,
+        }),
+      });
+      if (!res.ok) throw new Error(await apiErrorMessage(res, "貸出の登録に失敗しました"));
+      setCheckoutMessage("この物品を貸出しました");
+      setCheckoutNote("");
+      setAsset((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: "CHECKED_OUT",
+              currentLocationId: checkoutLocationId,
+            }
+          : prev,
+      );
+      setLocationId(checkoutLocationId);
+
+      const timelineRes = await fetch(apiUrl(`/assets/${id}/timeline`));
+      if (timelineRes.ok) {
+        const items = (await timelineRes.json()) as TimelineItem[];
+        setTimeline(items);
+      }
+    } catch (err: unknown) {
+      setCheckoutError(unknownErrorMessage(err, "貸出の登録に失敗しました"));
+    } finally {
+      setCheckoutLoading(false);
     }
   }
 
@@ -337,6 +404,49 @@ export function AssetEditPage() {
       </form>
 
       {loading && <p>読み込み中...</p>}
+      <section className="panel" style={{ marginTop: 16 }}>
+        <h2 className="panel-title">この物品を貸出する</h2>
+        <p className="panel-subtitle">編集画面から直接、貸出登録できます。</p>
+        <form className="form-grid" onSubmit={onCheckout}>
+          <label className="field">
+            <span>貸出先ユーザ</span>
+            <UiSelect
+              value={checkoutUserId}
+              onChange={setCheckoutUserId}
+              required
+              options={[
+                { value: "", label: "選択してください" },
+                ...users.map((u) => ({ value: u.id, label: u.name })),
+              ]}
+            />
+          </label>
+          <label className="field">
+            <span>場所</span>
+            <UiSelect
+              value={checkoutLocationId}
+              onChange={setCheckoutLocationId}
+              required
+              options={locations.map((loc) => ({ value: loc.id, label: loc.name }))}
+            />
+          </label>
+          <label className="field field-full">
+            <span>メモ</span>
+            <textarea rows={2} value={checkoutNote} onChange={(e) => setCheckoutNote(e.target.value)} />
+          </label>
+          <div className="field-full">
+            <button className="btn btn-primary" type="submit" disabled={checkoutLoading || asset?.status === "CHECKED_OUT"}>
+              貸出を登録
+            </button>
+            {asset?.status === "CHECKED_OUT" && (
+              <span style={{ marginLeft: 10, color: "#5d6a82" }}>
+                この物品は現在貸出中です。返却ページから返却してください。
+              </span>
+            )}
+          </div>
+        </form>
+        {checkoutMessage && <p className="msg-ok">{checkoutMessage}</p>}
+        {checkoutError && <p className="msg-err">{checkoutError}</p>}
+      </section>
       <section className="timeline-panel">
         <h2 className="panel-title">履歴タイムライン</h2>
         {loadingTimeline ? (

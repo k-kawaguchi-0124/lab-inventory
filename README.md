@@ -152,6 +152,17 @@ npm run dev -- --host 0.0.0.0
 
 ### サービス導入
 
+1) 設定ファイルを手動で作成（自動生成しません）
+
+```bash
+cd /opt/lab-inventory
+sudo cp deploy/systemd/lab-inventory.env.example /etc/default/lab-inventory
+sudo sed -i "s#__REPO_DIR__#/opt/lab-inventory#g" /etc/default/lab-inventory
+sudo vi /etc/default/lab-inventory
+```
+
+2) systemdサービスをインストール
+
 ```bash
 cd /opt/lab-inventory
 ./deploy/systemd/install-services.sh

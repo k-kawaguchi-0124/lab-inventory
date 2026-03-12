@@ -8,10 +8,15 @@ ENV_DEST="/etc/default/lab-inventory"
 ENV_TEMPLATE="$ROOT_DIR/deploy/systemd/lab-inventory.env.example"
 
 if [[ ! -f "$ENV_DEST" ]]; then
-  tmp_env="/tmp/lab-inventory.env"
-  sed "s#__REPO_DIR__#${ROOT_DIR}#g" "$ENV_TEMPLATE" > "$tmp_env"
-  sudo cp "$tmp_env" "$ENV_DEST"
-  rm -f "$tmp_env"
+  cat <<MSG
+Missing config: ${ENV_DEST}
+
+Create it manually first (example):
+  sudo cp "${ENV_TEMPLATE}" "${ENV_DEST}"
+  sudo sed -i "s#__REPO_DIR__#${ROOT_DIR}#g" "${ENV_DEST}"
+  sudo vi "${ENV_DEST}"
+MSG
+  exit 1
 fi
 
 for unit in lab-inventory-api.service lab-inventory-web.service; do
