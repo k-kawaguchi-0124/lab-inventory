@@ -15,6 +15,7 @@ type AssetCandidate = {
 };
 
 export function AssetCheckoutPage() {
+  const LAST_CHECKOUT_LOCATION_KEY = "asset-checkout-last-location-id";
   const [searchParams] = useSearchParams();
   const [assetId, setAssetId] = useState("");
   const [assetQuery, setAssetQuery] = useState("");
@@ -65,7 +66,12 @@ export function AssetCheckoutPage() {
         const u = (await uRes.json()) as User[];
         setLocations(l);
         setUsers(u);
-        if (l.length > 0) setLocationId(l[0].id);
+        const savedLocationId = window.localStorage.getItem(LAST_CHECKOUT_LOCATION_KEY);
+        if (savedLocationId && l.some((loc) => loc.id === savedLocationId)) {
+          setLocationId(savedLocationId);
+        } else if (l.length > 0) {
+          setLocationId(l[0].id);
+        }
         setUserId("");
       })
       .catch(() => {
@@ -73,6 +79,11 @@ export function AssetCheckoutPage() {
         setUsers([]);
       });
   }, []);
+
+  useEffect(() => {
+    if (!locationId) return;
+    window.localStorage.setItem(LAST_CHECKOUT_LOCATION_KEY, locationId);
+  }, [locationId]);
 
   useEffect(() => {
     const q = assetQuery.trim();

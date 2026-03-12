@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiUrl } from "../lib/api";
 import { UiSelect } from "../components/UiSelect";
@@ -20,10 +20,12 @@ type Asset = {
 };
 
 export function AssetListPage() {
+  const autocompleteRef = useRef<HTMLDivElement | null>(null);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
   const [candidates, setCandidates] = useState<Asset[]>([]);
   const [candidateLoading, setCandidateLoading] = useState(false);
+  const [autocompleteOpen, setAutocompleteOpen] = useState(false);
   const [items, setItems] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +59,11 @@ export function AssetListPage() {
   }, [listUrl]);
 
   useEffect(() => {
+    if (!autocompleteOpen) {
+      setCandidates([]);
+      setCandidateLoading(false);
+      return;
+    }
     const q = query.trim();
     if (q.length < 2) {
       setCandidates([]);
@@ -76,7 +83,17 @@ export function AssetListPage() {
       }
     }, 250);
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [query, autocompleteOpen]);
+
+  useEffect(() => {
+    function onPointerDown(event: MouseEvent) {
+      if (!autocompleteRef.current) return;
+      if (autocompleteRef.current.contains(event.target as Node)) return;
+      setAutocompleteOpen(false);
+    }
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, []);
 
   return (
     <section className="panel">
@@ -84,15 +101,19 @@ export function AssetListPage() {
       <p className="panel-subtitle">検索しなくても、登録済み備品を一覧で確認できます。</p>
 
       <div className="search-row">
-        <div className="autocomplete-wrap">
+        <div className="autocomplete-wrap" ref={autocompleteRef}>
           <input
             className="input"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onFocus={() => setAutocompleteOpen(true)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setAutocompleteOpen(true);
+            }}
             placeholder="名称 / シリアル / カテゴリ / 予算で絞り込み"
           />
-          {candidateLoading && <div className="autocomplete-hint">候補を検索中...</div>}
-          {!candidateLoading && candidates.length > 0 && (
+          {autocompleteOpen && candidateLoading && <div className="autocomplete-hint">候補を検索中...</div>}
+          {autocompleteOpen && !candidateLoading && candidates.length > 0 && (
             <div className="autocomplete-list">
               {candidates.map((c) => (
                 <button
@@ -102,6 +123,7 @@ export function AssetListPage() {
                   onClick={() => {
                     setQuery(c.serial);
                     setCandidates([]);
+                    setAutocompleteOpen(false);
                   }}
                 >
                   <span>{c.name}</span>
