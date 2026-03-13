@@ -1078,6 +1078,26 @@ select option {
     text-align: right;
   }
 
+  /* PC向けの列幅固定・省略指定をモバイルでは解除 */
+  .assets-list-table th,
+  .assets-list-table td {
+    width: auto !important;
+    max-width: none !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+  }
+
+  .assets-list-table td > * {
+    width: auto !important;
+    max-width: none !important;
+    display: inline !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    word-break: break-word;
+  }
+
   .users-table td[colspan],
   .borrowed-table td[colspan],
   .consumables-table td[colspan],
