@@ -637,6 +637,24 @@ select option {
   text-transform: uppercase;
 }
 
+/* 物品名が長い場合でも Name 列は1行で省略表示する */
+.assets-list-table td[data-label="Name"],
+.asset-search-table td[data-label="Name"] {
+  max-width: 280px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.assets-list-table td[data-label="Name"] > a,
+.asset-search-table td[data-label="Name"] > a,
+.asset-search-table td[data-label="Name"] > span {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
