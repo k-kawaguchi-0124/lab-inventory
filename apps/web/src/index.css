@@ -714,6 +714,7 @@ select option {
 .row-actions {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .search-actions-panel {
@@ -1033,6 +1034,15 @@ select option {
     background: #fff;
   }
 
+  .asset-search-table tr.row-selected {
+    background: #f3f8ff;
+    border-color: #c7dafc;
+  }
+
+  .asset-search-table tr.row-selected td {
+    background: transparent;
+  }
+
   .users-table td,
   .borrowed-table td,
   .consumables-table td,
@@ -1076,6 +1086,30 @@ select option {
   .stale-table td > *:only-child {
     margin-left: auto;
     text-align: right;
+  }
+
+  .search-actions-panel .row-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .search-actions-panel .row-actions > * {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .search-actions-panel .row-actions .btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-width: 0;
+    white-space: nowrap;
+    text-align: center;
+    padding: 10px 6px;
+    font-size: 13px;
   }
 
   /* PC向けの列幅固定・省略指定をモバイルでは解除 */
