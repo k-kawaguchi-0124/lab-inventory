@@ -195,7 +195,7 @@ export function AssetListPage() {
                   <td data-label="Location">{a.currentLocation?.name ?? a.currentLocationId}</td>
                   <td data-label="User">{a.currentUser?.name ?? (a.currentUserId ? a.currentUserId : "-")}</td>
                   <td data-label="Status">{a.status}</td>
-                  <td data-label="Last Activity">{new Date(a.lastActivityAt).toLocaleString("ja-JP")}</td>
+                  <td data-label="Last Activity">{new Date(a.lastActivityAt).toLocaleDateString("ja-JP")}</td>
                 </tr>
               ))
             )}

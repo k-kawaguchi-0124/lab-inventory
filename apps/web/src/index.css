@@ -638,21 +638,61 @@ select option {
 }
 
 /* 物品名が長い場合でも Name 列は1行で省略表示する */
-.assets-list-table td[data-label="Name"],
-.asset-search-table td[data-label="Name"] {
-  max-width: 280px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.assets-list-table {
+  table-layout: fixed;
+  min-width: 0;
 }
 
-.assets-list-table td[data-label="Name"] > a,
-.asset-search-table td[data-label="Name"] > a,
-.asset-search-table td[data-label="Name"] > span {
-  display: block;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+.assets-list-table th:nth-child(1),
+.assets-list-table td:nth-child(1) {
+  width: 10%;
+}
+
+.assets-list-table th:nth-child(2),
+.assets-list-table td:nth-child(2) {
+  width: 16%;
+}
+
+.assets-list-table th:nth-child(5),
+.assets-list-table td:nth-child(5) {
+  width: 8%;
+}
+
+.assets-list-table th:nth-child(6),
+.assets-list-table td:nth-child(6) {
+  width: 10%;
+}
+
+.assets-list-table th:nth-child(7),
+.assets-list-table td:nth-child(7) {
+  width: 7%;
+}
+
+.assets-list-table th:nth-child(8),
+.assets-list-table td:nth-child(8) {
+  width: 8%;
+}
+
+.assets-list-table th:nth-child(9),
+.assets-list-table td:nth-child(9) {
+  width: 13%;
+}
+
+@media (min-width: 641px) {
+  .assets-list-table th,
+  .assets-list-table td {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .assets-list-table td > * {
+    display: block;
+    width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
 }
 
 .mono {
